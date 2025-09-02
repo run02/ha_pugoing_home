@@ -4,5 +4,6 @@ from logging import Logger, getLogger
 
 LOGGER: Logger = getLogger(__package__)
 
-DOMAIN = "integration_blueprint"
+DOMAIN = "pugoing_home"
 ATTRIBUTION = "Data provided by http://jsonplaceholder.typicode.com/"
+LAMP_STATE_DEBOUNCE_SECONDS = 10

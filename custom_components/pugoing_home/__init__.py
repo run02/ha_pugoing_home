@@ -1,5 +1,5 @@
-"""
-Custom integration to integrate integration_blueprint with Home Assistant.
+# __init__.py
+"""Custom integration to integrate integration_blueprint with Home Assistant.
 
 For more details about this integration, please refer to
 https://github.com/ludeeus/integration_blueprint
@@ -18,6 +18,7 @@ from .api import IntegrationBlueprintApiClient
 from .const import DOMAIN, LOGGER
 from .coordinator import BlueprintDataUpdateCoordinator
 from .data import IntegrationBlueprintData
+from .assist_mqtt_bridge import AssistMqttBridge
 
 if TYPE_CHECKING:
     from homeassistant.core import HomeAssistant
@@ -26,8 +27,9 @@ if TYPE_CHECKING:
 
 PLATFORMS: list[Platform] = [
     Platform.SENSOR,
-    Platform.BINARY_SENSOR,
-    Platform.SWITCH,
+    # Platform.BINARY_SENSOR,
+    # Platform.SWITCH,
+    Platform.LIGHT,
 ]
 
 
@@ -41,7 +43,8 @@ async def async_setup_entry(
         hass=hass,
         logger=LOGGER,
         name=DOMAIN,
-        update_interval=timedelta(hours=1),
+        # update_interval=timedelta(hours=1),
+        update_interval=timedelta(seconds=10),
     )
     entry.runtime_data = IntegrationBlueprintData(
         client=IntegrationBlueprintApiClient(
@@ -59,6 +62,9 @@ async def async_setup_entry(
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
     entry.async_on_unload(entry.add_update_listener(async_reload_entry))
 
+    bridge = AssistMqttBridge(hass)
+    await bridge.start()
+    entry.runtime_data.mqtt_bridge = bridge
     return True
 
 

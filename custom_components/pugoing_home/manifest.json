@@ -1,0 +1,15 @@
+{
+  "domain": "pugoing_home",
+  "name": "PuGoing Home",
+  "codeowners": [
+    "@pugoing"
+  ],
+  "config_flow": true,
+  "documentation": "https://github.com/run02/pugoing",
+  "iot_class": "cloud_polling",
+  "issue_tracker": "https://github.com/run02/pugoing/issues",
+  "version": "0.1.0",
+  "branding": {
+    "logo": "https://www.cspugoing.com/pcimg/pugoing1.png"
+  }
+}

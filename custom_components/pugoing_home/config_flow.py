@@ -8,7 +8,7 @@ from homeassistant.const import CONF_PASSWORD, CONF_USERNAME
 from homeassistant.helpers import selector
 from homeassistant.helpers.aiohttp_client import async_create_clientsession
 from slugify import slugify
-
+from homeassistant.helpers.instance_id import async_get as async_get_instance_id
 from .api import (
     IntegrationBlueprintApiClient,
     IntegrationBlueprintApiClientAuthenticationError,
@@ -74,6 +74,8 @@ class BlueprintFlowHandler(config_entries.ConfigFlow, domain=DOMAIN):
                             type=selector.TextSelectorType.PASSWORD,
                         ),
                     ),
+                    # vol.Optional("my_field"): str,
+                    vol.Optional("debug"): bool,
                 },
             ),
             errors=_errors,
@@ -81,6 +83,9 @@ class BlueprintFlowHandler(config_entries.ConfigFlow, domain=DOMAIN):
 
     async def _test_credentials(self, username: str, password: str) -> None:
         """Validate credentials."""
+        ha_id = await async_get_instance_id(self.hass)
+        LOGGER.warning(f"ha_id: {ha_id}")
+
         client = IntegrationBlueprintApiClient(
             username=username,
             password=password,
