@@ -75,7 +75,7 @@ class BlueprintFlowHandler(config_entries.ConfigFlow, domain=DOMAIN):
                         ),
                     ),
                     # vol.Optional("my_field"): str,
-                    vol.Optional("debug"): bool,
+                    # vol.Optional("debug"): bool,
                 },
             ),
             errors=_errors,
