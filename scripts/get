@@ -66,7 +66,7 @@ function run() {
         rm -f "$haPath/custom_components/pugoing_home.zip"
 
         # TODO : change this link
-        wget "https://github.com/run02/ha_pugoing_home/releases/download/untagged-1e16776be8ec87a38e76/pugoing_home.zip"
+        wget "https://github.com/run02/ha_pugoing_home/releases/download/v0.1.0/pugoing_home.zip"
 
         if [ -d "$haPath/custom_components/pugoing_home" ]; then
             warn "pugoing_home directory already exist, cleaning up..."
