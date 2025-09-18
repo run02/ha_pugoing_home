@@ -15,7 +15,7 @@ from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.loader import async_get_loaded_integration
 
 from .api import IntegrationBlueprintApiClient
-from .const import DOMAIN, LOGGER
+from .const import DOMAIN, LOGGER, PUGOING_POLL_INTERVAL
 from .coordinator import BlueprintDataUpdateCoordinator
 from .data import IntegrationBlueprintData
 from .assist_mqtt_bridge import AssistMqttBridge
@@ -46,7 +46,7 @@ async def async_setup_entry(
         logger=LOGGER,
         name=DOMAIN,
         # update_interval=timedelta(hours=1),
-        update_interval=timedelta(seconds=10),
+        update_interval=timedelta(seconds=PUGOING_POLL_INTERVAL),
     )
     entry.runtime_data = IntegrationBlueprintData(
         client=IntegrationBlueprintApiClient(
