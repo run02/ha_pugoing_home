@@ -30,8 +30,8 @@ class BlueprintDataUpdateCoordinator(DataUpdateCoordinator):
         try:
             # 一行调用，返回的 data 包含 devices_by_type & token
             data = await self.config_entry.runtime_data.client.async_get_data()
-            devices = data.get("devices_by_type", {}).get("Lamp", [])
-            _LOGGER.info("Fetched %d Lamp devices from cloud.", len(devices))
+            # devices = data.get("devices_by_type", {}).get("Lamp", [])
+            # _LOGGER.info("Fetched %d Lamp devices from cloud.", len(devices))
             return data
         except IntegrationBlueprintApiClientAuthenticationError as exc:
             raise ConfigEntryAuthFailed(exc) from exc
