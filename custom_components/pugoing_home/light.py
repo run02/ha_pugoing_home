@@ -76,7 +76,7 @@ async def async_setup_entry(
         if removed_ids:
             reg = er.async_get(hass)
             for yid in removed_ids:
-                unique_id = f"pugoing_lamp_{yid}"
+                unique_id = f"{yid}"
                 ent_id = reg.async_get_entity_id("light", DOMAIN, unique_id)
                 if ent_id:
                     _LOGGER.info("Removing stale Lamp entity: %s", ent_id)
@@ -97,7 +97,7 @@ class PuGoingLampLight(IntegrationBlueprintEntity, LightEntity):
         super().__init__(coordinator)
         self._device_id = device["yid"]
         self._device_sn = device.get("sn", self._device_id)
-        self._attr_unique_id = f"pugoing_lamp_{self._device_id}"
+        self._attr_unique_id = f"{self._device_id}"
         self._attr_name = device.get("dname", "Lamp")
         self._state: bool = self._parse_state(device)
         self._last_manual_control: datetime | None = None
@@ -160,7 +160,7 @@ class PuGoingLampLight(IntegrationBlueprintEntity, LightEntity):
             return None
         return {
             "sn": dev.get("sn"),
-            "panel": dev.get("dpanel"),
+            "dpanel": dev.get("dpanel"),
             "room": dev.get("dloca"),
             "online": dev.get("online"),
         }
