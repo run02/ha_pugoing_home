@@ -168,6 +168,7 @@ async def process_rooms(token):
             except Exception as e:
                 lib_logger.error(f"Error processing room {room['name']}: {str(e)}")
 
+    lib_logger.debug("Processed devices:", json.dumps(devices_all, ensure_ascii=False))
     return merge_dicts(devices_all)
 
 

@@ -106,5 +106,5 @@ class PuGoingApiPublishView(HomeAssistantView):
             _LOGGER.info(msg)
             return web.json_response({"result": msg})
         except Exception as e:
-            _LOGGER.error("Publish API failed: %s", e)
+            _LOGGER.exception("Publish API failed: %s", e)
             return web.json_response({"error": str(e)}, status=500)

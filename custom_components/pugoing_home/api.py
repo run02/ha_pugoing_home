@@ -117,3 +117,56 @@ class IntegrationBlueprintApiClient:
         except Exception as e:
             _LOGGER.error("Failed to control lamp %s: %s", device_id, e)
             raise IntegrationBlueprintApiClientCommunicationError(str(e)) from e
+        
+    # ====== 控制窗帘（开关） ====== #
+    async def async_set_curtain_state(
+        self,
+        device_id: str,
+        sn: str,
+        action: str | None = None,  # "open" / "close" / "stop"
+        position: int | None = None,  # 0-100
+    ) -> None:
+        """设置窗帘设备状态（支持开、关、暂停、定位）。"""
+        await self._async_ensure_token()
+
+        # -------- key 映射 -------- #
+        key = None
+        if action == "open":
+            key = Dkey.CL_OPEN
+        elif action == "close":
+            key = Dkey.CL_CLOSE
+        elif action == "stop":
+            key = Dkey.CL_PAUSE
+        elif position is not None:
+            key = Dkey.CL_POS
+        else:
+            raise ValueError(
+                f"Invalid curtain command: action={action}, position={position}"
+            )
+
+        # -------- 附加参数 -------- #
+        # 一般卷帘定位需要传百分比位置，这里可以塞进 value 或 extra 参数
+        extra_value = None
+        if key == Dkey.CL_POS and position is not None:
+            extra_value = str(position)  # 设备协议需要百分比字符串，比如 "65"
+
+        try:
+            async with async_timeout.timeout(10):
+                result = await control_device(
+                    sn,
+                    "uip",  # 协议/接口类型
+                    extra_value or "",
+                    key,
+                    device_id,
+                    self._token,
+                    None,
+                )
+                _LOGGER.info(
+                    "Curtain control successful: %s (action=%s pos=%s)",
+                    result,
+                    action,
+                    position,
+                )
+        except Exception as e:
+            _LOGGER.error("Failed to control curtain %s: %s", device_id, e)
+            raise IntegrationBlueprintApiClientCommunicationError(str(e)) from e
