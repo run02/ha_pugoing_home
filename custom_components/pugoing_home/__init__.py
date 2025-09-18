@@ -19,6 +19,7 @@ from .const import DOMAIN, LOGGER
 from .coordinator import BlueprintDataUpdateCoordinator
 from .data import IntegrationBlueprintData
 from .assist_mqtt_bridge import AssistMqttBridge
+from .local.api_server import PuGoingApiMainView, PuGoingApiPublishView
 
 if TYPE_CHECKING:
     from homeassistant.core import HomeAssistant
@@ -65,6 +66,8 @@ async def async_setup_entry(
     bridge = AssistMqttBridge(hass)
     await bridge.start()
     entry.runtime_data.mqtt_bridge = bridge
+    hass.http.register_view(PuGoingApiMainView)
+    hass.http.register_view(PuGoingApiPublishView)
     return True
 
 
