@@ -194,3 +194,68 @@ class IntegrationBlueprintApiClient:
         except Exception as e:
             _LOGGER.error("Failed to execute scene sn=%s sid=%s: %s", sn, sid, e)
             raise IntegrationBlueprintApiClientCommunicationError(str(e)) from e
+
+    # ====== 控制空调（VRV） ====== #
+    async def async_set_vrv_state(
+        self,
+        device_id: str,
+        sn: str,
+        power: bool | None = None,  # True=开，False=关
+        mode: str | None = None,  # "cool" / "heat" / "dry" / "fan_only"
+        fan_mode: str | None = None,  # "high" / "medium" / "low"
+        temperature: int | None = None,  # 16-30
+    ) -> None:
+        """设置空调状态：开关/模式/风速/温度。"""
+        await self._async_ensure_token()
+
+        tasks = []
+
+        # 开关
+        if power is True:
+            tasks.append((Dkey.VRV_OPEN, None))
+        elif power is False:
+            tasks.append((Dkey.VRV_CLOSE, None))
+
+        # 模式
+        if mode == "cool":
+            tasks.append((Dkey.VRV_MCOLD, None))
+        elif mode == "heat":
+            tasks.append((Dkey.VRV_MHOT, None))
+        elif mode == "dry":
+            tasks.append(("VRV_MDRY", None))
+        elif mode == "fan_only":
+            tasks.append((Dkey.VRV_MWIND, None))
+
+        # 风速
+        if fan_mode == "high":
+            tasks.append(("VRV_WSH", None))
+        elif fan_mode == "medium":
+            tasks.append(("VRV_WSM", None))
+        elif fan_mode == "low":
+            tasks.append(("VRV_WSL", None))
+
+        # 温度
+        if temperature is not None:
+            if 16 <= temperature <= 30:
+                tasks.append((f"VRV_T{temperature}", None))
+            else:
+                raise ValueError("VRV temperature must be 16-30")
+
+        try:
+            async with async_timeout.timeout(10):
+                for key, extra in tasks:
+                    result = await control_device(
+                        sn,
+                        "uip",
+                        "",
+                        key,
+                        device_id,
+                        self._token,
+                        extra,
+                    )
+                    _LOGGER.info(
+                        "VRV control: key=%s extra=%s result=%s", key, extra, result
+                    )
+        except Exception as e:
+            _LOGGER.error("Failed to control VRV %s: %s", device_id, e)
+            raise IntegrationBlueprintApiClientCommunicationError(str(e)) from e

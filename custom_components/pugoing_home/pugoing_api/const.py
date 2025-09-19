@@ -57,3 +57,5 @@ class Dkey(str, Enum):
     VRV_MHOT = "VRV_MHOT"  # 制热
     VRV_MAUTO = "VRV_MAUTO"  # 制热
     VRV_T = "VRV_T"  # 温度
+    VRV_MWIND = "VRV_MWIND"  # 风扇
+    
