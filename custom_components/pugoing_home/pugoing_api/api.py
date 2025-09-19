@@ -86,6 +86,31 @@ async def fetch_devices_by_room(token, sn, room_name):
                 lib_logger.error(f"Request failed with message: {result.get('msg')}")
                 raise Exception(f"Request failed with message: {result.get('msg')}")
 
+async def fetch_scenes_by_sn(token: str, sn: str):
+    """根据主机 SN 获取场景列表"""
+    data = build_token_payload(token, {"sn": sn})
+    headers = build_token_headers(token)
+
+    async with aiohttp.ClientSession() as session:
+        try:
+            async with session.post(
+                selectedUrls["fetchScenesBySn"], json=data, headers=headers, timeout=15
+            ) as response:
+                result = await response.json()
+                if result.get("ack") == 1:
+                    return result["data"]["list"]
+                else:
+                    error_message = result.get("msg", "Unknown error")
+                    if error_message == "主机不在线":
+                        raise DeviceOfflineError()
+                    elif error_message == "您没有此权限访问该主机":
+                        raise NoPermissionError()
+                    lib_logger.error(f"fetch_scenes_by_sn failed: {error_message}")
+                    return []
+        except Exception as e:
+            lib_logger.error(f"Error during fetch_scenes_by_sn: {e}")
+            raise e
+
 
 async def control_device(sn, fm, dvcm, dkey, yid, token, digv=None):
     data = {"sn": sn, "fm": fm, "dvcm": dvcm, "dkey": dkey, "yid": yid}
@@ -151,25 +176,44 @@ def merge_dicts(dict_list):
 
 async def process_rooms(token):
     sn_room_list = await fetch_sn_and_room_list(token)
-    lib_logger.debug("Retrieved sn_room_list:", json.dumps(sn_room_list, ensure_ascii=False))
+    lib_logger.debug(
+        "Retrieved sn_room_list:", json.dumps(sn_room_list, ensure_ascii=False)
+    )
 
     if not sn_room_list:
         return {"event": {"header": None, "payload": None}}
 
     devices_all = []
+    scenes_all = {}
+
     for sn_room in sn_room_list:
         sn = sn_room["sn"]
+
+        # 获取场景
+        try:
+            scenes = await fetch_scenes_by_sn(token, sn)
+            if scenes:
+                scenes_all[sn] = scenes
+        except Exception as e:
+            lib_logger.error(f"Error fetching scenes for sn {sn}: {str(e)}")
+
+        # 获取设备
         room_list = sn_room["room"]
         for room in room_list:
             try:
-                devices = await categorize_devices_by_panel(token, sn, room['name'])
+                devices = await categorize_devices_by_panel(token, sn, room["name"])
                 if devices:
                     devices_all.append(devices)
             except Exception as e:
                 lib_logger.error(f"Error processing room {room['name']}: {str(e)}")
 
     lib_logger.debug("Processed devices:", json.dumps(devices_all, ensure_ascii=False))
-    return merge_dicts(devices_all)
+    lib_logger.debug("Processed scenes:", json.dumps(scenes_all, ensure_ascii=False))
+
+    return {
+        "devices": merge_dicts(devices_all),
+        "scenes": scenes_all,
+    }
 
 
 async def get_devices_by_hotel_room_name(name: str, token: str) -> dict:
@@ -218,3 +262,26 @@ async def login(username: str, password: str):
             else:
                 lib_logger.error(f"Login failed with message: {result.get('msg')}")
                 raise Exception(f"Login failed with message: {result.get('msg')}")
+async def execute_scene(token: str, sn: str, sid: str) -> dict:
+    """执行指定场景"""
+    data = build_token_payload(token, {"sn": sn, "sid": sid})
+    headers = build_token_headers(token)
+
+    async with aiohttp.ClientSession() as session:
+        try:
+            async with session.post(
+                selectedUrls["executeScene"],  # 记得在 const.py 里配置这个URL
+                json=data,
+                headers=headers,
+                timeout=15,
+            ) as response:
+                result = await response.json()
+                if result.get("ack") == 1:
+                    return result
+                else:
+                    error_message = result.get("msg", "Unknown error")
+                    lib_logger.error(f"Execute scene failed: {error_message}")
+                    raise PuGoingInvalidResponseError(error_message)
+        except Exception as e:
+            lib_logger.error(f"Error during execute_scene: {e}")
+            raise e

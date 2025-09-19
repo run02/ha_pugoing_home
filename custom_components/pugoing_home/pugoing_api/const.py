@@ -11,6 +11,8 @@ urls = {
         "controlDevice": "http://wx.xq.cspugoing.com/Manage/device/plataction",
         "login": "http://wx.xq.cspugoing.com/Manage/Index/login",
         "fetchDeviceByYid": "http://wx.xq.cspugoing.com/Manage/device/devbyyid",
+        "fetchScenesBySn": "http://wx.xq.cspugoing.com/Manage/Scene/listsys",
+        "executeScene": "http://wx.xq.cspugoing.com/Manage/Scene/scaction",
     },
     "international": {
         "fetchSnList": f"{GA_HTTP_BASE}/Manage/device/listsys",

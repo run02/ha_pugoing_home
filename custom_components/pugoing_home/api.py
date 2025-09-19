@@ -9,7 +9,12 @@ from typing import Any, Dict, List
 import aiohttp
 import async_timeout
 
-from .pugoing_api.api import control_device, login as pugoing_login, process_rooms
+from .pugoing_api.api import (
+    control_device,
+    execute_scene,
+    login as pugoing_login,
+    process_rooms,
+)
 from .pugoing_api.const import Dkey, Dpanel
 
 _LOGGER = logging.getLogger(__name__)
@@ -53,14 +58,18 @@ class IntegrationBlueprintApiClient:
         返回结构：
         {
             "devices_by_type": { "Lamp": [...], "Switch": [...], ... },
+            "scenes_by_sn": { "10D07A48A61A": [ {...}, {...} ] },
             "token": "...",
         }
         """
         await self._async_ensure_token()
-        devices_by_type = await self._async_fetch_devices()
+
+        # 一口气获取设备和场景
+        result = await process_rooms(self._token)
 
         return {
-            "devices_by_type": devices_by_type,
+            "devices_by_type": result.get("devices", {}),
+            "scenes_by_sn": result.get("scenes", {}),
             "token": self._token,
         }
 
@@ -169,4 +178,19 @@ class IntegrationBlueprintApiClient:
                 )
         except Exception as e:
             _LOGGER.error("Failed to control curtain %s: %s", device_id, e)
+            raise IntegrationBlueprintApiClientCommunicationError(str(e)) from e
+
+    # ====== 执行场景 ====== #
+    async def async_execute_scene(self, sn: str, sid: str) -> dict:
+        """执行场景"""
+        await self._async_ensure_token()
+        try:
+            async with async_timeout.timeout(10):
+                result = await execute_scene(self._token, sn, sid)
+                _LOGGER.info(
+                    "Execute scene successful: %s (sn=%s, sid=%s)", result, sn, sid
+                )
+                return result
+        except Exception as e:
+            _LOGGER.error("Failed to execute scene sn=%s sid=%s: %s", sn, sid, e)
             raise IntegrationBlueprintApiClientCommunicationError(str(e)) from e
