@@ -1,6 +1,7 @@
 # custom_components/integration_blueprint/button.py
 
 from __future__ import annotations
+from datetime import datetime, timedelta
 import logging
 from typing import Any, TYPE_CHECKING
 
@@ -18,6 +19,8 @@ if TYPE_CHECKING:
     from .coordinator import BlueprintDataUpdateCoordinator
     from .data import IntegrationBlueprintConfigEntry
 
+from .const import BUTTON_STATE_DEBOUNCE_SECONDS
+
 _LOGGER = logging.getLogger(__name__)
 
 
@@ -31,9 +34,12 @@ async def async_setup_entry(
     coordinator: BlueprintDataUpdateCoordinator = entry.runtime_data.coordinator
 
     known_ids: set[str] = set()
+    entities_by_sid: dict[str, PuGoingSceneButton] = {}
 
-    def _create_entity(sn: str, sc: dict[str, Any]):
-        return PuGoingSceneButton(coordinator, sn, sc)
+    def _create_entity(sn: str, sc: dict[str, Any]) -> PuGoingSceneButton:
+        entity = PuGoingSceneButton(coordinator, sn, sc)
+        entities_by_sid[sc["sid"]] = entity
+        return entity
 
     async def _async_add_initial() -> None:
         scenes_by_sn: dict[str, list[dict]] = coordinator.data.get("scenes_by_sn", {})
@@ -67,8 +73,9 @@ async def async_setup_entry(
                     if sc["sid"] in new_ids:
                         new_entities.append(_create_entity(sn, sc))
                         known_ids.add(sc["sid"])
-            async_add_entities(new_entities)
-            _LOGGER.info("Dynamically added %d Scene buttons", len(new_entities))
+            if new_entities:
+                async_add_entities(new_entities)
+                _LOGGER.info("Dynamically added %d Scene buttons", len(new_entities))
 
         # 删除
         removed_ids = known_ids - current_ids
@@ -80,14 +87,26 @@ async def async_setup_entry(
                 if ent_id:
                     _LOGGER.info("Removing stale Scene button: %s", ent_id)
                     reg.async_remove(ent_id)
+            for sid in removed_ids:
+                entities_by_sid.pop(sid, None)
             known_ids.difference_update(removed_ids)
+
+        # 更新：触发场景变化检测
+        for sn, scenes in scenes_by_sn.items():
+            for sc in scenes:
+                sid = sc["sid"]
+                if sid in entities_by_sid:
+                    entities_by_sid[sid]._trigger_from_update(sc)
 
     coordinator.async_add_listener(_handle_scene_changes)
 
 
 # ----------------------------- entity ----------------------------------- #
+# ----------------------------- entity ----------------------------------- #
 class PuGoingSceneButton(IntegrationBlueprintEntity, ButtonEntity):
     """无状态场景按钮，按下即触发场景。"""
+
+    DEBOUNCE_INTERVAL = timedelta(seconds=BUTTON_STATE_DEBOUNCE_SECONDS)  # 消抖时间，可调
 
     def __init__(self, coordinator, sn: str, scene: dict[str, Any]):
         super().__init__(coordinator)
@@ -96,16 +115,64 @@ class PuGoingSceneButton(IntegrationBlueprintEntity, ButtonEntity):
         self._scene = scene
         self._attr_unique_id = f"scene_{self._sid}"
         self._attr_name = scene.get("sna", "场景")
+        self._last_sinfo = scene.get("sinfo", "")
+
+        self._last_trigger: datetime | None = None  # 上次触发时间
+
+    def _can_trigger(self) -> bool:
+        """是否允许触发（消抖逻辑）"""
+        now = datetime.now()
+        if self._last_trigger and (now - self._last_trigger) < self.DEBOUNCE_INTERVAL:
+            _LOGGER.debug(
+                "Debounced scene %s (%s): triggered too soon",
+                self._scene.get("sna"),
+                self._sid,
+            )
+            return False
+        self._last_trigger = now
+        return True
 
     async def async_press(self, **kwargs: Any) -> None:
+        """手动点击按钮 → 执行场景"""
+        if not self._can_trigger():
+            return
         try:
+            # 记录一次“手动”状态，避免下次刷新误触发
+
+            _LOGGER.info("Last sinfo: %s", self._last_sinfo)
+            self._last_sinfo = f"{datetime.now().strftime('%m/%d %H:%M')} 手动"
+            _LOGGER.info("New sinfo: %s", self._last_sinfo)
+            self._scene["sinfo"] = self._last_sinfo
+            _LOGGER.info("Executed scene %s (%s)", self._scene.get("sna"), self._sid)
             await self.coordinator.config_entry.runtime_data.client.async_execute_scene(
                 sn=self._sn,
                 sid=self._sid,
             )
-            _LOGGER.info("Executed scene %s (%s)", self._scene.get("sna"), self._sid)
         except PuGoingAPIError as e:
             _LOGGER.warning("Failed to execute scene %s: %s", self._sid, e)
+
+    def _trigger_from_update(self, new_scene: dict[str, Any]) -> None:
+        """从 coordinator 更新时检测 sinfo 变化并触发"""
+        if not self._can_trigger():
+                return
+        
+        new_sinfo = new_scene.get("sinfo", "")
+        
+        if new_sinfo and new_sinfo != self._last_sinfo:
+
+            
+            _LOGGER.info("New sinfo: %s", new_sinfo)
+            _LOGGER.info("Last sinfo: %s", self._last_sinfo)
+            
+            self._last_sinfo = new_sinfo
+            self._scene = new_scene
+            _LOGGER.info("Scene %s triggered from update: %s", self._sid, new_sinfo)
+            # 让 HA 认为按钮被按过一次
+            self.hass.async_create_task(self.async_press_effect())
+
+    async def async_press_effect(self):
+        """只更新 HA 状态，不调用 API"""
+        self.async_write_ha_state()
 
     @property
     def extra_state_attributes(self) -> dict[str, Any] | None:
