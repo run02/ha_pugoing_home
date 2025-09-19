@@ -85,6 +85,11 @@ class PuGoingVRVClimate(IntegrationBlueprintEntity, ClimateEntity):
     @property
     def target_temperature(self) -> float:
         return self._temperature
+    
+    @property
+    def target_temperature_step(self) -> float:
+        """Return the temperature step."""
+        return 1.0
 
     # -------- control -------- #
     async def async_set_hvac_mode(self, hvac_mode: str) -> None:
