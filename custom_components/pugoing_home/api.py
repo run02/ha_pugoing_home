@@ -164,12 +164,12 @@ class IntegrationBlueprintApiClient:
                 result = await control_device(
                     sn,
                     "uip",  # 协议/接口类型
-                    extra_value or "",
+                    "",
                     key,
                     device_id,
                     self._token,
-                    None,
-                )
+                    extra_value or None,
+                )        
                 _LOGGER.info(
                     "Curtain control successful: %s (action=%s pos=%s)",
                     result,
