@@ -239,18 +239,19 @@ class PuGoingRGBCWLight(PuGoingLampLight):
     _attr_color_mode = ColorMode.BRIGHTNESS
     _attr_min_color_temp_kelvin = DEFAULT_MIN_KELVIN
     _attr_max_color_temp_kelvin = DEFAULT_MAX_KELVIN
-    def __init__(
-        self, coordinator: BlueprintDataUpdateCoordinator, device: dict[str, Any]
-    ):
+
+    def __init__(self, coordinator, device):
         super().__init__(coordinator, device)
         self._attr_name = device.get("dname", "RGBCW Lamp")
         self._brightness: int | None = None
         self._color_temp: int | None = None
         self._rgb_color: tuple[int, int, int] | None = None
+        self._last_update: datetime | None = None  # 上次解析时间
+        self._last_manual_control: datetime | None = None  # 上次手动操作时间
         self._parse_rgbcw(device)
 
-    # ---------- 解析 RGBCW ---------- #
-    def _parse_rgbcw(self, device: dict[str, Any]) -> None:
+    # ----------------- 解析 RGBCW ----------------- #
+    def _parse_rgbcw(self, device):
         raw = str(device.get("dnlp", ""))
         if not raw.startswith("RGBCW:"):
             return
@@ -259,28 +260,38 @@ class PuGoingRGBCWLight(PuGoingLampLight):
             return
 
         try:
-            power_hex = data[:2]  # 04 / 03
-            mode_hex = data[2:4]  # 04=RGB / 03=亮度+色温
+            power_hex = data[:2]
+            mode_hex = data[2:4]
             brightness_hex = data[4:6]
             color_temp_hex = data[6:8]
-            r_hex = data[8:10]
-            g_hex = data[10:12]
-            b_hex = data[12:14]
+            r_hex, g_hex, b_hex = data[8:10], data[10:12], data[12:14]
 
-            self._state = power_hex == "03"
-
-            if mode_hex == "03":
-                self._attr_color_mode = ColorMode.COLOR_TEMP
-            elif mode_hex == "04":
-                self._attr_color_mode = ColorMode.RGB
-
-            self._brightness = int(brightness_hex, 16) * 255 // 100
-            self._color_temp = 153 + int(color_temp_hex, 16)  # 大概映射到 mired
-            self._rgb_color = (
+            new_state = power_hex == "03"
+            new_brightness = int(brightness_hex, 16) * 255 // 100
+            min_temp, max_temp = DEFAULT_MIN_KELVIN, DEFAULT_MAX_KELVIN
+            new_color_temp = int(
+                min_temp + (max_temp - min_temp) * (int(color_temp_hex, 16) / 100)
+            )
+            new_rgb = (
                 round(int(r_hex, 16) / 100 * 255),
                 round(int(g_hex, 16) / 100 * 255),
                 round(int(b_hex, 16) / 100 * 255),
             )
+
+            # 消抖逻辑：如果在手动操作后的 10 秒内，忽略 coordinator 下发的数据
+            if (
+                self._last_manual_control
+                and datetime.now() - self._last_manual_control < timedelta(seconds=10)
+            ):
+                return
+
+            # 否则，更新状态
+            self._state = new_state
+            self._brightness = new_brightness
+            self._color_temp = new_color_temp
+            self._rgb_color = new_rgb
+            self._last_update = datetime.now()
+
         except Exception as e:
             _LOGGER.debug("Failed to parse RGBCW data: %s", e)
 
@@ -321,6 +332,7 @@ class PuGoingRGBCWLight(PuGoingLampLight):
                 color_temp=color_temp,
                 rgb_hex="%02X%02X%02X" % rgb_color if rgb_color else None,
             )
+            # 手动控制 → 立刻更新状态
             self._state = True
             if brightness:
                 self._brightness = brightness
@@ -333,11 +345,12 @@ class PuGoingRGBCWLight(PuGoingLampLight):
         except PuGoingAPIError as e:
             _LOGGER.warning("Failed to set RGBCW lamp %s: %s", self._device_id, e)
 
-    async def async_turn_off(self, **kwargs: Any) -> None:
+    async def async_turn_off(self, **kwargs):
         try:
             await self.coordinator.config_entry.runtime_data.client.async_set_dimmer_state(
                 self._device_id, sn=self._device_sn, on=False
             )
+            # 手动控制 → 立刻更新状态
             self._state = False
             self._last_manual_control = datetime.now()
             self.async_write_ha_state()

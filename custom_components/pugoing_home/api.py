@@ -142,7 +142,7 @@ class IntegrationBlueprintApiClient:
         - 开关：on=True/False
         - 亮度：传 0-100，实际值=整数✖2.54
         - 色温：支持两种格式：
-            * 开尔文值：如 1377, 2000-6500
+            * 开尔文值：如 1377, 2000-6535
             * 百分比：0-100，实际值=(整数✖3.47)+153
         - RGB：传 hex 字符串，比如 "FF0000"
         """
@@ -184,7 +184,7 @@ class IntegrationBlueprintApiClient:
         # 色温 - 支持开尔文值和百分比两种格式
         if color_temp is not None:
             # 判断是开尔文值还是百分比
-            if 2000 <= color_temp <= 6500:  # 开尔文值范围
+            if 2000 <= color_temp <= 6535:  # 开尔文值范围
                 # 将开尔文值转换为设备需要的格式: (开尔文值 - 153) / 3.47
                 cct_value = str(int((color_temp - 153) / 3.47))
                 tasks.append((Dkey.LAMP_CCT, cct_value))
@@ -206,13 +206,13 @@ class IntegrationBlueprintApiClient:
             else:
                 _LOGGER.error(
                     "Invalid color temp value: %s. Must be either:\n"
-                    "- Kelvin: 2000-6500\n"
+                    "- Kelvin: 2000-6535\n"
                     "- Percentage: 0-100",
                     color_temp,
                 )
                 raise ValueError(
                     "Color temp must be either:\n"
-                    "- Kelvin value (2000-6500)\n"
+                    "- Kelvin value (2000-6535)\n"
                     "- Percentage (0-100)"
                 )
 

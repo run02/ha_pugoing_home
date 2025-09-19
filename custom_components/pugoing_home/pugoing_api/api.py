@@ -8,8 +8,8 @@ from .const import selectedUrls, DEVELOPING, api_version
 from .utils import LoggerUtility
 from .error import DeviceOfflineError, NoPermissionError, PuGoingInvalidResponseError
 
-# lib_logger = LoggerUtility(name="lib_logger", log_level=logging.DEBUG)
-lib_logger = LoggerUtility(name="lib_logger", log_level=logging.INFO)
+lib_logger = LoggerUtility(name="lib_logger", log_level=logging.DEBUG)
+# lib_logger = LoggerUtility(name="lib_logger", log_level=logging.INFO)
 
 
 def build_token_headers(token):
