@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import time
 import logging
 from typing import Any, Dict, List
@@ -127,60 +128,122 @@ class IntegrationBlueprintApiClient:
             _LOGGER.error("Failed to control lamp %s: %s", device_id, e)
             raise IntegrationBlueprintApiClientCommunicationError(str(e)) from e
         # ====== 控制调光调色灯 ====== #
-
     async def async_set_dimmer_state(
         self,
         device_id: str,
         sn: str,
         on: bool | None = None,  # 开关
         brightness: int | None = None,  # 0-100
-        color_temp: int | None = None,  # 0-100
+        color_temp: int | None = None,  # 支持开尔文值 (如 1377) 或 0-100 范围
         rgb_hex: str | None = None,  # "FF0000"
     ) -> None:
         """
         设置调光调色灯状态：
         - 开关：on=True/False
         - 亮度：传 0-100，实际值=整数✖2.54
-        - 色温：传 0-100，实际值=(整数✖3.47)+153
+        - 色温：支持两种格式：
+            * 开尔文值：如 1377, 2000-6500
+            * 百分比：0-100，实际值=(整数✖3.47)+153
         - RGB：传 hex 字符串，比如 "FF0000"
         """
         await self._async_ensure_token()
+
+        # 记录传入参数
+        _LOGGER.debug(
+            "Setting dimmer state for device %s (SN: %s): on=%s, brightness=%s, color_temp=%s, rgb_hex=%s",
+            device_id,
+            sn,
+            on,
+            brightness,
+            color_temp,
+            rgb_hex,
+        )
 
         tasks: list[tuple[str, str | None]] = []
 
         # 开关
         if on is True:
             tasks.append((Dkey.LAMP_OPEN, None))
+            _LOGGER.debug("Added OPEN task")
         elif on is False:
             tasks.append((Dkey.LAMP_CLOSE, None))
+            _LOGGER.debug("Added CLOSE task")
 
         # 亮度
         if brightness is not None:
             if 0 <= brightness <= 100:
                 bri_value = str(int(brightness * 2.54))
                 tasks.append((Dkey.LAMP_BRI, bri_value))
+                _LOGGER.debug(
+                    "Added BRIGHTNESS task: input=%s, output=%s", brightness, bri_value
+                )
             else:
+                _LOGGER.error("Invalid brightness value: %s (must be 0-100)", brightness)
                 raise ValueError("Brightness must be 0-100")
 
-        # 色温
+        # 色温 - 支持开尔文值和百分比两种格式
         if color_temp is not None:
-            if 0 <= color_temp <= 100:
+            # 判断是开尔文值还是百分比
+            if 2000 <= color_temp <= 6500:  # 开尔文值范围
+                # 将开尔文值转换为设备需要的格式: (开尔文值 - 153) / 3.47
+                cct_value = str(int((color_temp - 153) / 3.47))
+                tasks.append((Dkey.LAMP_CCT, cct_value))
+                _LOGGER.debug(
+                    "Added COLOR_TEMP task (Kelvin): input=%sK, output=%s",
+                    color_temp,
+                    cct_value,
+                )
+
+            elif 0 <= color_temp <= 100:  # 百分比范围
                 cct_value = str(int(color_temp * 3.47 + 153))
                 tasks.append((Dkey.LAMP_CCT, cct_value))
+                _LOGGER.debug(
+                    "Added COLOR_TEMP task (Percentage): input=%s%%, output=%s",
+                    color_temp,
+                    cct_value,
+                )
+
             else:
-                raise ValueError("Color temp must be 0-100")
+                _LOGGER.error(
+                    "Invalid color temp value: %s. Must be either:\n"
+                    "- Kelvin: 2000-6500\n"
+                    "- Percentage: 0-100",
+                    color_temp,
+                )
+                raise ValueError(
+                    "Color temp must be either:\n"
+                    "- Kelvin value (2000-6500)\n"
+                    "- Percentage (0-100)"
+                )
 
         # RGB
         if rgb_hex is not None:
             if len(rgb_hex) == 6:  # 简单校验
-                tasks.append((Dkey.LAMP_RGB, rgb_hex.upper()))
+                rgb_hex = rgb_hex.upper()
+                tasks.append((Dkey.LAMP_RGB, rgb_hex))
+                _LOGGER.debug("Added RGB task: %s", rgb_hex)
             else:
+                _LOGGER.error("Invalid RGB hex format: %s (must be 6-digit hex)", rgb_hex)
                 raise ValueError("RGB must be a 6-digit hex string, e.g., 'FF0000'")
+
+        # 记录最终任务列表
+        _LOGGER.info(
+            "Prepared %d control tasks for device %s: %s", len(tasks), device_id, tasks
+        )
+
+        # 如果没有任务，提前返回
+        if not tasks:
+            _LOGGER.warning("No control tasks to execute for device %s", device_id)
+            return
 
         # 执行控制
         try:
             async with async_timeout.timeout(10):
-                for key, extra in tasks:
+                for i, (key, extra) in enumerate(tasks, 1):
+                    _LOGGER.debug(
+                        "Executing task %d/%d: key=%s, extra=%s", i, len(tasks), key, extra
+                    )
+
                     result = await control_device(
                         sn,
                         "uip",
@@ -190,15 +253,108 @@ class IntegrationBlueprintApiClient:
                         self._token,
                         extra,
                     )
+
                     _LOGGER.info(
-                        "Dimmer control: key=%s extra=%s result=%s",
+                        "Dimmer control task %d/%d completed: key=%s extra=%s result=%s",
+                        i,
+                        len(tasks),
                         key,
                         extra,
                         result,
                     )
+
+            _LOGGER.info(
+                "All control tasks completed successfully for device %s", device_id
+            )
+
+        except asyncio.TimeoutError:
+            _LOGGER.error("Control timeout for device %s after 10 seconds", device_id)
+            raise IntegrationBlueprintApiClientCommunicationError(
+                "Control timeout"
+            ) from None
+
         except Exception as e:
-            _LOGGER.error("Failed to control dimmer lamp %s: %s", device_id, e)
+            _LOGGER.error(
+                "Failed to control dimmer lamp %s (SN: %s): %s. Tasks attempted: %s",
+                device_id,
+                sn,
+                e,
+                tasks,
+            )
+            _LOGGER.exception("Full exception details:")
             raise IntegrationBlueprintApiClientCommunicationError(str(e)) from e
+
+    # async def async_set_dimmer_state(
+    #     self,
+    #     device_id: str,
+    #     sn: str,
+    #     on: bool | None = None,  # 开关
+    #     brightness: int | None = None,  # 0-100
+    #     color_temp: int | None = None,  # 0-100
+    #     rgb_hex: str | None = None,  # "FF0000"
+    # ) -> None:
+    #     """
+    #     设置调光调色灯状态：
+    #     - 开关：on=True/False
+    #     - 亮度：传 0-100，实际值=整数✖2.54
+    #     - 色温：传 0-100，实际值=(整数✖3.47)+153
+    #     - RGB：传 hex 字符串，比如 "FF0000"
+    #     """
+    #     await self._async_ensure_token()
+
+    #     tasks: list[tuple[str, str | None]] = []
+
+    #     # 开关
+    #     if on is True:
+    #         tasks.append((Dkey.LAMP_OPEN, None))
+    #     elif on is False:
+    #         tasks.append((Dkey.LAMP_CLOSE, None))
+
+    #     # 亮度
+    #     if brightness is not None:
+    #         if 0 <= brightness <= 100:
+    #             bri_value = str(int(brightness * 2.54))
+    #             tasks.append((Dkey.LAMP_BRI, bri_value))
+    #         else:
+    #             raise ValueError("Brightness must be 0-100")
+
+    #     # 色温
+    #     if color_temp is not None:
+    #         if 0 <= color_temp <= 100:
+    #             cct_value = str(int(color_temp * 3.47 + 153))
+    #             tasks.append((Dkey.LAMP_CCT, cct_value))
+    #         else:
+    #             raise ValueError("Color temp must be 0-100")
+
+    #     # RGB
+    #     if rgb_hex is not None:
+    #         if len(rgb_hex) == 6:  # 简单校验
+    #             tasks.append((Dkey.LAMP_RGB, rgb_hex.upper()))
+    #         else:
+    #             raise ValueError("RGB must be a 6-digit hex string, e.g., 'FF0000'")
+
+    #     # 执行控制
+    #     try:
+    #         async with async_timeout.timeout(10):
+    #             for key, extra in tasks:
+    #                 result = await control_device(
+    #                     sn,
+    #                     "uip",
+    #                     "",
+    #                     key,
+    #                     device_id,
+    #                     self._token,
+    #                     extra,
+    #                 )
+    #                 _LOGGER.info(
+    #                     "Dimmer control: key=%s extra=%s result=%s",
+    #                     key,
+    #                     extra,
+    #                     result,
+    #                 )
+    #     except Exception as e:
+    #         _LOGGER.error("Failed to control dimmer lamp %s: %s", device_id, e)
+    #         raise IntegrationBlueprintApiClientCommunicationError(str(e)) from e
 
     # ====== 控制窗帘（开关） ====== #
     async def async_set_curtain_state(

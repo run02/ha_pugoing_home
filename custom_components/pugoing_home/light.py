@@ -15,6 +15,8 @@ from homeassistant.components.light import (
     ATTR_BRIGHTNESS,
     ATTR_COLOR_TEMP_KELVIN as ATTR_COLOR_TEMP,
     ATTR_RGB_COLOR,
+    DEFAULT_MAX_KELVIN,
+    DEFAULT_MIN_KELVIN,
 )
 from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers.device_registry import DeviceInfo
@@ -235,7 +237,8 @@ class PuGoingRGBCWLight(PuGoingLampLight):
         ColorMode.RGB,
     }
     _attr_color_mode = ColorMode.BRIGHTNESS
-
+    _attr_min_color_temp_kelvin = DEFAULT_MIN_KELVIN
+    _attr_max_color_temp_kelvin = DEFAULT_MAX_KELVIN
     def __init__(
         self, coordinator: BlueprintDataUpdateCoordinator, device: dict[str, Any]
     ):
@@ -315,7 +318,7 @@ class PuGoingRGBCWLight(PuGoingLampLight):
                 sn=self._device_sn,
                 on=True,
                 brightness=int(brightness * 100 / 255) if brightness else None,
-                color_temp=int(color_temp * 100 / 255) if color_temp else None,
+                color_temp=color_temp,
                 rgb_hex="%02X%02X%02X" % rgb_color if rgb_color else None,
             )
             self._state = True
