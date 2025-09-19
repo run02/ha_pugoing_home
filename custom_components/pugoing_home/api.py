@@ -106,6 +106,34 @@ class IntegrationBlueprintApiClient:
             or (time.time() - self._token_ts) > (TOKEN_LIFETIME - TOKEN_BUF)
         ):
             await self._async_login()
+        # ====== 控制断路器 ====== #
+
+    async def async_set_breaker_state(self, device_id: str, sn: str, on: bool) -> None:
+        """设置断路器设备状态（开/关）。"""
+        await self._async_ensure_token()
+
+        key = Dkey.DLQ_OPEN if on else Dkey.DLQ_CLOSE
+
+        try:
+            async with async_timeout.timeout(10):
+                result = await control_device(
+                    sn,
+                    "uip",  # 固定协议
+                    "",
+                    key,
+                    device_id,
+                    self._token,
+                    None,  # 断路器只要开关，不需要额外参数
+                )
+                _LOGGER.info(
+                    "Breaker control successful: %s (device=%s, on=%s)",
+                    result,
+                    device_id,
+                    on,
+                )
+        except Exception as e:
+            _LOGGER.error("Failed to control breaker %s: %s", device_id, e)
+            raise IntegrationBlueprintApiClientCommunicationError(str(e)) from e
 
     # ====== 控制灯光（开关） ====== #
     async def async_set_lamp_state(

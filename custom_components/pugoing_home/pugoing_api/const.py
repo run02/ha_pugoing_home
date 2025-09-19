@@ -59,3 +59,6 @@ class Dkey(str, Enum):
     VRV_T = "VRV_T"  # 温度
     VRV_MWIND = "VRV_MWIND"  # 风扇
     
+    
+    DLQ_OPEN="DLQ_OPEN" #断路器打开
+    DLQ_CLOSE="DLQ_CLOSE" #断路器关闭
