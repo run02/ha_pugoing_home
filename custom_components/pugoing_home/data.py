@@ -1,9 +1,8 @@
-"""Custom types for integration_blueprint."""
-
+# data.py
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Optional
 
 if TYPE_CHECKING:
     from homeassistant.config_entries import ConfigEntry
@@ -11,6 +10,7 @@ if TYPE_CHECKING:
 
     from .api import IntegrationBlueprintApiClient
     from .coordinator import BlueprintDataUpdateCoordinator
+    from .assist_mqtt_bridge import AssistMqttBridge
 
 
 type IntegrationBlueprintConfigEntry = ConfigEntry[IntegrationBlueprintData]
@@ -23,3 +23,4 @@ class IntegrationBlueprintData:
     client: IntegrationBlueprintApiClient
     coordinator: BlueprintDataUpdateCoordinator
     integration: Integration
+    mqtt_bridge: Optional[AssistMqttBridge] = None  # 👈 增加这个

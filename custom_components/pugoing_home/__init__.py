@@ -50,6 +50,8 @@ async def async_setup_entry(
         # update_interval=timedelta(hours=1),
         update_interval=timedelta(seconds=PUGOING_POLL_INTERVAL),
     )
+    bridge = AssistMqttBridge(hass)
+    await bridge.start()
     entry.runtime_data = IntegrationBlueprintData(
         client=IntegrationBlueprintApiClient(
             username=entry.data[CONF_USERNAME],
@@ -58,6 +60,7 @@ async def async_setup_entry(
         ),
         integration=async_get_loaded_integration(hass, entry.domain),
         coordinator=coordinator,
+        mqtt_bridge=bridge,
     )
 
     # https://developers.home-assistant.io/docs/integration_fetching_data#coordinated-single-api-poll-for-data-for-all-entities
@@ -66,11 +69,9 @@ async def async_setup_entry(
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
     entry.async_on_unload(entry.add_update_listener(async_reload_entry))
 
-    bridge = AssistMqttBridge(hass)
-    await bridge.start()
-    entry.runtime_data.mqtt_bridge = bridge
     hass.http.register_view(PuGoingApiMainView)
     hass.http.register_view(PuGoingApiPublishView)
+
     return True
 
 

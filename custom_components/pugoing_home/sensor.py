@@ -58,7 +58,8 @@ async def async_setup_entry(
     """Set up IntelligentButler sensors based on a config entry."""
     coordinator: BlueprintDataUpdateCoordinator = entry.runtime_data.coordinator
 
-    known_ids: Set[str] = set()  # Track devices already added
+    known_ids: Set[str] = set()  # 已创建实体的 yid
+    subscribed_ids: Set[str] = set()  # 已订阅的 xqid
 
     def _create_entities(dev: Dict[str, Any]):
         """Create three sensor entities (temp/hum/lum) for one physical device."""
@@ -69,6 +70,7 @@ async def async_setup_entry(
         ]
 
     async def _async_add_initial():
+        """Add entities for devices already known at startup."""
         butlers: List[Dict] = coordinator.data.get("devices_by_type", {}).get(
             "IntelligentButler", []
         )
@@ -78,9 +80,17 @@ async def async_setup_entry(
             known_ids.add(yid)
             entities.extend(_create_entities(dev))
 
+            # 订阅 MQTT（避免重复）
+            xqid = dev.get("xqid")
+            if xqid and xqid not in subscribed_ids:
+                entry.runtime_data.mqtt_bridge.subscribe_device(xqid)
+                subscribed_ids.add(xqid)
+
         if entities:
             async_add_entities(entities)
-            _LOGGER.info("Added %d initial IntelligentButler sensor entities", len(entities))
+            _LOGGER.info(
+                "Added %d initial IntelligentButler sensor entities", len(entities)
+            )
 
     await _async_add_initial()
 
@@ -92,18 +102,27 @@ async def async_setup_entry(
         )
         current_ids: Set[str] = {dev["yid"] for dev in butlers_now}
 
-        # New devices
+        # ---------------- 新增设备 ----------------
         new_ids = current_ids - known_ids
         if new_ids:
             new_entities: List[SensorEntity] = []
             for dev in butlers_now:
                 if dev["yid"] in new_ids:
                     new_entities.extend(_create_entities(dev))
+
+                    # 订阅 MQTT
+                    xqid = dev.get("xqid")
+                    if xqid and xqid not in subscribed_ids:
+                        entry.runtime_data.mqtt_bridge.subscribe_device(xqid)
+                        subscribed_ids.add(xqid)
+
             known_ids.update(new_ids)
             async_add_entities(new_entities)
-            _LOGGER.info("Dynamically added %d new IntelligentButler sensors", len(new_entities))
+            _LOGGER.info(
+                "Dynamically added %d new IntelligentButler sensors", len(new_entities)
+            )
 
-        # Removed devices
+        # ---------------- 移除设备 ----------------
         removed_ids = known_ids - current_ids
         if removed_ids:
             dev_reg = dr.async_get(hass)
@@ -120,6 +139,13 @@ async def async_setup_entry(
                 if device:
                     dev_reg.async_remove_device(device.id)
             known_ids.difference_update(removed_ids)
+
+            # 可选：如果 mqtt_bridge 支持取消订阅，可以在这里调用
+            # for dev in removed_ids:
+            #     xqid = dev.get("xqid")
+            #     if xqid and xqid in subscribed_ids:
+            #         entry.runtime_data.mqtt_bridge.unsubscribe_device(xqid)
+            #         subscribed_ids.remove(xqid)
 
     coordinator.async_add_listener(_handle_butler_changes)
 
