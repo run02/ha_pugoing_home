@@ -16,7 +16,9 @@ from homeassistant.helpers import (
     area_registry as ar,
     device_registry as dr,
 )
-
+from homeassistant.const import (
+    EntityCategory,
+)
 from .const import DOMAIN, LAMP_STATE_DEBOUNCE_SECONDS
 from .entity import IntegrationBlueprintEntity
 from .pugoing_api.error import PuGoingAPIError
@@ -93,6 +95,9 @@ async def async_setup_entry(
 # ----------------------------- entity: 断路器 --------------------------- #
 class PuGoingBreakerSwitch(IntegrationBlueprintEntity, SwitchEntity):
     """Representation of a Breaker (断路器)."""
+    # _attr_entity_category = EntityCategory.DIAGNOSTIC
+    _attr_icon = "mdi:power"  # 用醒目的 icon
+    # _attr_device_class = None  # 不归类 outlet/light
 
     def __init__(
         self, coordinator: BlueprintDataUpdateCoordinator, device: dict[str, Any]
