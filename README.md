@@ -4,7 +4,7 @@ ha_pugoing_home
 
 #### container
 
-To set up `PuGoing Home`, you can use the [`PuGoing Home` download script](https://github.com/run02/ha_pugoing_home/releases/download/v0.1.0/get).
+To set up `PuGoing Home`, you can use the [`PuGoing Home` download script](https://github.com/run02/ha_pugoing_home/releases/download/v0.1.1/get).
 
 1. Open a terminal.
 
@@ -13,7 +13,7 @@ To set up `PuGoing Home`, you can use the [`PuGoing Home` download script](https
 3. Run the `PuGoing Home` download script.
 
    ```sh
-   wget -O - https://github.com/run02/ha_pugoing_home/releases/download/v0.1.0/get | bash -
+   wget -O - https://github.com/run02/ha_pugoing_home/releases/download/v0.1.1/get | bash -
    ```
 
 ##### Finalizing steps
@@ -32,7 +32,7 @@ To set up `PuGoing Home`, you can use the [`PuGoing Home` download script](https
 3. Run the `PuGoing Home` download script.
 
    ```sh
-   wget -O - https://github.com/run02/ha_pugoing_home/releases/download/v0.1.0/get | bash -
+   wget -O - https://github.com/run02/ha_pugoing_home/releases/download/v0.1.1/get | bash -
    ```
 
 ##### Finalizing steps
