@@ -19,3 +19,4 @@ config/*
 
 # my cfg
 tmp
+out

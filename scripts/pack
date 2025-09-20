@@ -1,0 +1,5 @@
+#!/bin/bash
+
+mkdir -p out
+zip -r out/pugoing_home.zip custom_components/pugoing_home/ -x "*/__pycache__/*" "*.pyc" "*.pyo"
+cp scripts/get out/
