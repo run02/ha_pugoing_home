@@ -92,3 +92,38 @@ class BlueprintFlowHandler(config_entries.ConfigFlow, domain=DOMAIN):
             session=async_create_clientsession(self.hass),
         )
         await client.async_get_data()
+
+
+# from homeassistant import config_entries
+# import voluptuous as vol
+# from .const import DOMAIN, PUGOING_POLL_INTERVAL as DEFAULT_POLL_INTERVAL
+
+
+# class BlueprintOptionsFlowHandler(config_entries.OptionsFlow):
+#     """Handle options for PuGoing integration."""
+
+#     def __init__(self, config_entry: config_entries.ConfigEntry) -> None:
+#         self.config_entry = config_entry
+
+#     async def async_step_init(self, user_input=None):
+#         """Manage the options."""
+#         if user_input is not None:
+#             return self.async_create_entry(title="", data=user_input)
+
+#         current = self.config_entry.options.get("poll_interval", DEFAULT_POLL_INTERVAL)
+#         return self.async_show_form(
+#             step_id="init",
+#             data_schema=vol.Schema(
+#                 {
+#                     vol.Required(
+#                         "poll_interval",
+#                         default=current,
+#                     ): vol.All(int, vol.Range(min=1, max=3600)),
+#                 }
+#             ),
+#         )
+
+
+# async def async_get_options_flow(config_entry: config_entries.ConfigEntry):
+#     """Return the options flow handler."""
+#     return BlueprintOptionsFlowHandler(config_entry)
