@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 import logging
+import time
 from typing import TYPE_CHECKING, Any
 
 from homeassistant.components.climate import (
@@ -73,6 +74,10 @@ class PuGoingVRVClimate(IntegrationBlueprintEntity, ClimateEntity):
         self._fan_mode: str = FAN_MEDIUM
         self._temperature: int = 26
 
+        # 消抖用缓存
+        self._last_values: dict[str, Any] = {}
+        self._last_change: dict[str, float] = {}
+
     # -------- required props -------- #
     @property
     def hvac_mode(self) -> str:
@@ -85,7 +90,7 @@ class PuGoingVRVClimate(IntegrationBlueprintEntity, ClimateEntity):
     @property
     def target_temperature(self) -> float:
         return self._temperature
-    
+
     @property
     def target_temperature_step(self) -> float:
         """Return the temperature step."""
@@ -152,16 +157,22 @@ class PuGoingVRVClimate(IntegrationBlueprintEntity, ClimateEntity):
         temp = caps.get("tem")
         fan = caps.get("ws")
 
-        if power == "00":
-            self._hvac_mode = HVACMode.OFF
-        else:
-            self._hvac_mode = self._map_mode(mode)
+        new_values = {
+            "hvac_mode": HVACMode.OFF if power == "00" else self._map_mode(mode),
+            "temperature": int(temp) if temp and temp.isdigit() else self._temperature,
+            "fan_mode": self._map_fan(fan) if fan else self._fan_mode,
+        }
 
-        if temp and temp.isdigit():
-            self._temperature = int(temp)
-
-        if fan:
-            self._fan_mode = self._map_fan(fan)
+        now = time.time()
+        for key, val in new_values.items():
+            if self._last_values.get(key) != val:
+                # 状态变化了，重置计时器
+                self._last_change[key] = now
+                self._last_values[key] = val
+            else:
+                # 状态一致，判断是否超过10秒
+                if now - self._last_change.get(key, 0) >= 10:
+                    setattr(self, f"_{key}", val)
 
     # -------- extra attrs -------- #
     @property
