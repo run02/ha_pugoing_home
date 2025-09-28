@@ -1,5 +1,7 @@
 #!/bin/bash
-
+rm -r out
 mkdir -p out
-zip -r out/pugoing_home.zip custom_components/pugoing_home/ -x "*/__pycache__/*" "*.pyc" "*.pyo"
+cd custom_components/pugoing_home
+zip -r ../../out/pugoing_home.zip . -x "*/__pycache__/*" "*.pyc" "*.pyo" "__pycache__/*"
+cd ../..
 cp scripts/get out/

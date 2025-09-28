@@ -2,14 +2,11 @@
   "domain": "pugoing_home",
   "name": "PuGoing Home",
   "codeowners": [
-    "@pugoing"
+    "@run02"
   ],
   "config_flow": true,
-  "documentation": "https://github.com/run02/pugoing",
+  "documentation": "https://github.com/run02/ha_pugoing_home",
   "iot_class": "cloud_polling",
-  "issue_tracker": "https://github.com/run02/pugoing/issues",
-  "version": "0.1.0",
-  "branding": {
-    "logo": "https://www.cspugoing.com/pcimg/pugoing1.png"
-  }
+  "issue_tracker": "https://github.com/run02/ha_pugoing_home/issues",
+  "version": "0.2.0"
 }
