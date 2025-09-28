@@ -1,24 +1,23 @@
-"""Switch platform for PuGoing integration (integration_blueprint).
-
-Dynamic add/remove Breaker entities using DataUpdateCoordinator.
-"""
+"""Switch platform for PuGoing integration (integration_blueprint)."""
 
 from __future__ import annotations
 
-from datetime import datetime, timedelta
 import logging
+from datetime import UTC, datetime, timedelta
 from typing import TYPE_CHECKING, Any
 
 from homeassistant.components.switch import SwitchEntity
-from homeassistant.helpers import entity_registry as er
-from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers import (
     area_registry as ar,
+)
+from homeassistant.helpers import (
     device_registry as dr,
 )
-from homeassistant.const import (
-    EntityCategory,
+from homeassistant.helpers import (
+    entity_registry as er,
 )
+from homeassistant.helpers.device_registry import DeviceInfo
+
 from .const import DOMAIN, LAMP_STATE_DEBOUNCE_SECONDS
 from .entity import IntegrationBlueprintEntity
 from .pugoing_api.error import PuGoingAPIError
@@ -30,6 +29,10 @@ if TYPE_CHECKING:
     from .coordinator import BlueprintDataUpdateCoordinator
     from .data import IntegrationBlueprintConfigEntry
 
+DCAP_VOLTAGE_INDEX = 3
+DCAP_CURRENT_INDEX = 4
+DCAP_TEMPERATURE_INDEX = 6
+
 _LOGGER = logging.getLogger(__name__)
 
 
@@ -39,74 +42,78 @@ async def async_setup_entry(
     entry: IntegrationBlueprintConfigEntry,
     async_add_entities: AddEntitiesCallback,
 ) -> None:
-    """Create Switch entities for every Breaker device and listen for changes."""
+    """Create switch entities for every breaker device and listen for changes."""
     coordinator: BlueprintDataUpdateCoordinator = entry.runtime_data.coordinator
-
     known_ids: set[str] = set()
 
-    def _create_entity(dev: dict[str, Any]):
-        return PuGoingBreakerSwitch(coordinator, dev)
+    def _create_entity(device: dict[str, Any]) -> PuGoingBreakerSwitch:
+        """Create a breaker entity from raw device data."""
+        return PuGoingBreakerSwitch(coordinator, device)
 
     async def _async_add_initial() -> None:
+        """Add breaker entities discovered during initial setup."""
         breakers = coordinator.data.get("devices_by_type", {}).get("Breaker", [])
-        entities = []
-        for dev in breakers:
-            yid = dev["yid"]
+        entities: list[PuGoingBreakerSwitch] = []
+        for device in breakers:
+            yid = device["yid"]
             known_ids.add(yid)
-            entities.append(_create_entity(dev))
+            entities.append(_create_entity(device))
         if entities:
             async_add_entities(entities)
-            _LOGGER.info("Added %d initial Breaker entities", len(entities))
+            _LOGGER.info("Added %d initial breaker entities", len(entities))
 
     await _async_add_initial()
 
-    # ---------------- listener: add & remove ---------------------------#
-    def _handle_breaker_changes() -> None:  # must be sync for coordinator listener
-        breakers_now: list[dict] = coordinator.data.get("devices_by_type", {}).get(
-            "Breaker", []
-        )
-        current_ids: set[str] = {dev["yid"] for dev in breakers_now}
+    def _handle_breaker_changes() -> None:
+        """Handle dynamic additions and removals reported by the coordinator."""
+        devices_by_type = coordinator.data.get("devices_by_type", {})
+        breakers_now: list[dict[str, Any]] = devices_by_type.get("Breaker", [])
+        current_ids: set[str] = {device["yid"] for device in breakers_now}
 
         # Detect new breakers
         new_ids = current_ids - known_ids
         if new_ids:
             new_entities = [
-                _create_entity(dev) for dev in breakers_now if dev["yid"] in new_ids
+                _create_entity(device)
+                for device in breakers_now
+                if device["yid"] in new_ids
             ]
             known_ids.update(new_ids)
             async_add_entities(new_entities)
-            _LOGGER.info("Dynamically added %d Breaker entities", len(new_entities))
+            _LOGGER.info("Dynamically added %d breaker entities", len(new_entities))
 
         # Detect removed breakers
         removed_ids = known_ids - current_ids
-        if removed_ids:
-            reg = er.async_get(hass)
-            for yid in removed_ids:
-                unique_id = f"{yid}"
-                ent_id = reg.async_get_entity_id("switch", DOMAIN, unique_id)
-                if ent_id:
-                    _LOGGER.info("Removing stale Breaker entity: %s", ent_id)
-                    reg.async_remove(ent_id)
-            known_ids.difference_update(removed_ids)
+        if not removed_ids:
+            return
+
+        reg = er.async_get(hass)
+        for yid in removed_ids:
+            unique_id = f"{yid}"
+            ent_id = reg.async_get_entity_id("switch", DOMAIN, unique_id)
+            if ent_id:
+                _LOGGER.info("Removing stale breaker entity: %s", ent_id)
+                reg.async_remove(ent_id)
+        known_ids.difference_update(removed_ids)
 
     coordinator.async_add_listener(_handle_breaker_changes)
 
 
 # ----------------------------- entity: 断路器 --------------------------- #
 class PuGoingBreakerSwitch(IntegrationBlueprintEntity, SwitchEntity):
-    """Representation of a Breaker (断路器)."""
-    # _attr_entity_category = EntityCategory.DIAGNOSTIC
-    _attr_icon = "mdi:power"  # 用醒目的 icon
-    # _attr_device_class = None  # 不归类 outlet/light
+    """Representation of a breaker device."""
+
+    _attr_icon = "mdi:power"
 
     def __init__(
         self, coordinator: BlueprintDataUpdateCoordinator, device: dict[str, Any]
-    ):
+    ) -> None:
+        """Initialise the breaker entity from coordinator data."""
         super().__init__(coordinator)
         self._device_id = device["yid"]
         self._device_sn = device.get("sn", self._device_id)
         self._attr_unique_id = f"{self._device_id}"
-        # 优先使用 danam，如果为空或不存在则使用 dname
+        # 优先用 danam, 如果为空或不存在则使用 dname
         danam = device.get("danam", "")
         dname = device.get("dname", "Breaker")
         self._attr_name = danam if danam else dname
@@ -116,9 +123,11 @@ class PuGoingBreakerSwitch(IntegrationBlueprintEntity, SwitchEntity):
     # ---------- helpers ---------- #
     @staticmethod
     def _parse_state(device: dict[str, Any]) -> bool:
+        """Parse the on/off state from the device payload."""
         return str(device.get("dinfo", "")) == "开"
 
     def _latest(self) -> dict[str, Any] | None:
+        """Return the latest coordinator payload for this device."""
         for dev in self.coordinator.data.get("devices_by_type", {}).get("Breaker", []):
             if dev["yid"] == self._device_id:
                 return dev
@@ -127,11 +136,12 @@ class PuGoingBreakerSwitch(IntegrationBlueprintEntity, SwitchEntity):
     # ---------- required props ----- #
     @property
     def is_on(self) -> bool:
-        if self._last_manual_control:
-            if datetime.now() - self._last_manual_control < timedelta(
-                seconds=LAMP_STATE_DEBOUNCE_SECONDS
-            ):
-                return self._state
+        """Return whether the breaker is currently on."""
+        if self._last_manual_control and (
+            datetime.now(tz=UTC) - self._last_manual_control
+            < timedelta(seconds=LAMP_STATE_DEBOUNCE_SECONDS)
+        ):
+            return self._state
 
         latest = self._latest()
         if latest is not None:
@@ -140,55 +150,71 @@ class PuGoingBreakerSwitch(IntegrationBlueprintEntity, SwitchEntity):
 
     @property
     def available(self) -> bool:
+        """Return whether the breaker still exists in the coordinator data."""
         return self._latest() is not None
 
     # ---------- control ------------ #
-    async def async_turn_on(self, **kwargs: Any) -> None:
+    async def async_turn_on(self, **_kwargs: Any) -> None:
+        """Turn on the breaker, updating local state optimistically."""
+        client = self.coordinator.config_entry.runtime_data.client
         try:
-            await self.coordinator.config_entry.runtime_data.client.async_set_breaker_state(
-                self._device_id, sn=self._device_sn, on=True
+            await client.async_set_breaker_state(
+                self._device_id,
+                sn=self._device_sn,
+                on=True,
             )
             self._state = True
-            self._last_manual_control = datetime.now()
+            self._last_manual_control = datetime.now(tz=UTC)
             self.async_write_ha_state()
-        except PuGoingAPIError as e:
-            _LOGGER.warning("Failed to turn on breaker %s: %s", self._device_id, e)
+        except PuGoingAPIError as err:
+            _LOGGER.warning("Failed to turn on breaker %s: %s", self._device_id, err)
 
-    async def async_turn_off(self, **kwargs: Any) -> None:
+    async def async_turn_off(self, **_kwargs: Any) -> None:
+        """Turn off the breaker, updating local state optimistically."""
+        client = self.coordinator.config_entry.runtime_data.client
         try:
-            await self.coordinator.config_entry.runtime_data.client.async_set_breaker_state(
-                self._device_id, sn=self._device_sn, on=False
+            await client.async_set_breaker_state(
+                self._device_id,
+                sn=self._device_sn,
+                on=False,
             )
             self._state = False
-            self._last_manual_control = datetime.now()
+            self._last_manual_control = datetime.now(tz=UTC)
             self.async_write_ha_state()
-        except PuGoingAPIError as e:
-            _LOGGER.warning("Failed to turn off breaker %s: %s", self._device_id, e)
+        except PuGoingAPIError as err:
+            _LOGGER.warning("Failed to turn off breaker %s: %s", self._device_id, err)
 
     # ---------- extra attrs -------- #
     @property
     def extra_state_attributes(self) -> dict[str, Any] | None:
+        """Return additional diagnostic attributes for the breaker."""
         dev = self._latest()
         if dev is None:
             return None
+        diagnostics = dev.get("dcap")
+        metrics = diagnostics.split(";") if diagnostics else []
         return {
             "sn": dev.get("sn"),
             "dpanel": dev.get("dpanel"),
             "room": dev.get("dloca"),
             "online": dev.get("online"),
-            "danam": dev.get("danam"),  # 添加 danam 信息
-            "voltage": dev.get("dcap", "").split(";")[3] if dev.get("dcap") else None,
-            "current": dev.get("dcap", "").split(";")[4] if dev.get("dcap") else None,
-            "temperature": dev.get("dcap", "").split(";")[6]
-            if dev.get("dcap")
+            "danam": dev.get("danam"),
+            "voltage": metrics[DCAP_VOLTAGE_INDEX]
+            if len(metrics) > DCAP_VOLTAGE_INDEX
+            else None,
+            "current": metrics[DCAP_CURRENT_INDEX]
+            if len(metrics) > DCAP_CURRENT_INDEX
+            else None,
+            "temperature": metrics[DCAP_TEMPERATURE_INDEX]
+            if len(metrics) > DCAP_TEMPERATURE_INDEX
             else None,
         }
+
     @property
     def device_info(self) -> DeviceInfo:
-        """让每个断路器各自成为一个设备。"""
+        """Expose each breaker as an individual device."""
         dev = self._latest() or {}
-
-        # 优先使用 danam，如果为空或不存在则使用 dname
+        # 优先使用 danam, 如果为空或不存在则使用 dname
         danam = dev.get("danam", "")
         dname = dev.get("dname", f"Breaker {self._device_id}")
         device_name = danam if danam else dname
@@ -196,15 +222,25 @@ class PuGoingBreakerSwitch(IntegrationBlueprintEntity, SwitchEntity):
         return DeviceInfo(
             identifiers={(DOMAIN, self._device_id)},
             name=device_name,
-            manufacturer="PuGoing",
+            manufacturer=dev.get("dsign", "PuGoing"),
             model=dev.get("dpanel", "Breaker"),
         )
-    # ---------- HA 回调：实体已加入 ---------------- #
+
+    # ---------- HA 回调: 实体已加入 ---------------- #
     async def async_added_to_hass(self) -> None:
-        """实体注册完成后，自动把设备归到对应区域。"""
+        """Assign the breaker to the correct area once it is registered."""
         await super().async_added_to_hass()
 
-        area_name = (self._latest() or {}).get("dloca")
+        reg = dr.async_get(self.hass)
+        device = reg.async_get_device(identifiers={(DOMAIN, self._device_id)})
+        if device is None:
+            return
+
+        dev = self._latest()
+        if dev is None:
+            return
+
+        area_name = dev.get("dloca")
         if not area_name:
             return
 
@@ -213,7 +249,5 @@ class PuGoingBreakerSwitch(IntegrationBlueprintEntity, SwitchEntity):
         if area is None:
             area = area_reg.async_create(area_name)
 
-        dev_reg = dr.async_get(self.hass)
-        device = dev_reg.async_get_device({(DOMAIN, self._device_id)})
-        if device and device.area_id != area.id:
-            dev_reg.async_update_device(device.id, area_id=area.id)
+        if device.area_id != area.id:
+            reg.async_update_device(device.id, area_id=area.id)

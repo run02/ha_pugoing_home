@@ -2,15 +2,15 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Optional
+from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from homeassistant.config_entries import ConfigEntry
     from homeassistant.loader import Integration
 
     from .api import IntegrationBlueprintApiClient
-    from .coordinator import BlueprintDataUpdateCoordinator
     from .assist_mqtt_bridge import AssistMqttBridge
+    from .coordinator import BlueprintDataUpdateCoordinator
 
 
 type IntegrationBlueprintConfigEntry = ConfigEntry[IntegrationBlueprintData]
@@ -23,4 +23,4 @@ class IntegrationBlueprintData:
     client: IntegrationBlueprintApiClient
     coordinator: BlueprintDataUpdateCoordinator
     integration: Integration
-    mqtt_bridge: Optional[AssistMqttBridge] = None  # 👈 增加这个
+    mqtt_bridge: AssistMqttBridge | None = None  # 👈 增加这个

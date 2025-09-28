@@ -1,10 +1,9 @@
-from typing import Optional
 
 
 class PuGoingAPIError(Exception):
     """蒲公英 API 基础异常类"""
 
-    def __init__(self, message: str, error_code: Optional[str] = None):
+    def __init__(self, message: str, error_code: str | None = None):
         super().__init__(message)
         self.error_code = error_code
 

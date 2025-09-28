@@ -1,15 +1,19 @@
 # custom_components/pugoing_home/assist_mqtt_bridge.py
 
+from __future__ import annotations
+
 import json
 import logging
 import threading
-from typing import Any
+from typing import TYPE_CHECKING
 
 import paho.mqtt.client as mqtt
 from homeassistant.components import conversation
 from homeassistant.const import EVENT_HOMEASSISTANT_STOP
-from homeassistant.core import HomeAssistant, Context
-from homeassistant.components.conversation import ConversationResult
+from homeassistant.core import Context, HomeAssistant
+
+if TYPE_CHECKING:
+    from homeassistant.components.conversation import ConversationResult
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -21,7 +25,7 @@ def _extract_speech(resp) -> str:
             getattr(getattr(getattr(resp, "speech", None), "plain", None), "speech", "")
             or ""
         ).strip()
-    except Exception:
+    except (AttributeError, TypeError):
         pass
     if isinstance(resp, dict):
         return resp.get("speech", {}).get("plain", {}).get("speech", "").strip()
@@ -94,17 +98,17 @@ class AssistMqttBridge:
             _LOGGER.info("Subscribed to device topic %s", topic)
 
     # ---------------------- paho 回调 ----------------------- #
-    def _on_connect(self, client, _userdata, _flags, rc):  # noqa: N802
+    def _on_connect(self, client, _userdata, _flags, rc):
         if rc == 0:
             _LOGGER.info("MQTT connected")
             # 已知的 topic 会在 subscribe_device 时动态添加
         else:
             _LOGGER.warning("MQTT connect failed rc=%s", rc)
 
-    def _on_disconnect(self, _client, _userdata, rc):  # noqa: N802
+    def _on_disconnect(self, _client, _userdata, rc):
         _LOGGER.warning("MQTT disconnected rc=%s", rc)
 
-    def _on_message(self, _client, _userdata, msg):  # noqa: N802
+    def _on_message(self, _client, _userdata, msg):
         text = msg.payload.decode(errors="ignore").strip()
         if not text:
             _LOGGER.debug("Empty payload ignored")
@@ -123,7 +127,7 @@ class AssistMqttBridge:
 
     # ---------------------- Assist 调用 --------------------- #
     def _schedule_assist(self, text: str, xqid: str) -> None:
-        """包装成 task，留在主线程执行协程."""
+        """包装成 task,留在主线程执行协程."""
         self.hass.async_create_task(self._assist_and_respond(text, xqid))
 
     async def _assist_and_respond(self, text: str, xqid: str) -> None:
@@ -137,7 +141,7 @@ class AssistMqttBridge:
                 agent_id=None,
             )
 
-            speech = _extract_speech(result.response) or "（Assist 无回复）"
+            speech = _extract_speech(result.response) or "(Assist 无回复)"
             intent_type = _extract_intent_type(getattr(result, "intent", None))
             intent_input = getattr(result, "intent_input", None) or text
 

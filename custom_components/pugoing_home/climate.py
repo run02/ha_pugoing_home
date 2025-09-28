@@ -1,6 +1,7 @@
 """Climate platform for PuGoing integration."""
 
 from __future__ import annotations
+
 import logging
 import time
 from typing import TYPE_CHECKING, Any
@@ -10,9 +11,8 @@ from homeassistant.components.climate import (
     ClimateEntityFeature,
     HVACMode,
 )
-from homeassistant.components.climate.const import FAN_HIGH, FAN_MEDIUM, FAN_LOW
-from homeassistant.const import UnitOfTemperature, ATTR_TEMPERATURE
-
+from homeassistant.components.climate.const import FAN_HIGH, FAN_LOW, FAN_MEDIUM
+from homeassistant.const import ATTR_TEMPERATURE, UnitOfTemperature
 from homeassistant.helpers.device_registry import DeviceInfo
 
 from .const import DOMAIN
@@ -22,6 +22,7 @@ from .pugoing_api.error import PuGoingAPIError
 if TYPE_CHECKING:
     from homeassistant.core import HomeAssistant
     from homeassistant.helpers.entity_platform import AddEntitiesCallback
+
     from .coordinator import BlueprintDataUpdateCoordinator
     from .data import IntegrationBlueprintConfigEntry
 
@@ -166,13 +167,12 @@ class PuGoingVRVClimate(IntegrationBlueprintEntity, ClimateEntity):
         now = time.time()
         for key, val in new_values.items():
             if self._last_values.get(key) != val:
-                # 状态变化了，重置计时器
+                # 状态变化了,重置计时器
                 self._last_change[key] = now
                 self._last_values[key] = val
-            else:
-                # 状态一致，判断是否超过10秒
-                if now - self._last_change.get(key, 0) >= 10:
-                    setattr(self, f"_{key}", val)
+            # 状态一致,判断是否超过10秒
+            elif now - self._last_change.get(key, 0) >= 10:
+                setattr(self, f"_{key}", val)
 
     # -------- extra attrs -------- #
     @property

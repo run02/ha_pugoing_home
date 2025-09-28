@@ -1,22 +1,25 @@
-"""PuGoing 云端 API 客户端。"""
+"""PuGoing 云端 API 客户端."""
 
 from __future__ import annotations
 
-import asyncio
-import time
 import logging
-from typing import Any, Dict, List
+import time
+from typing import TYPE_CHECKING, Any
 
-import aiohttp
 import async_timeout
 
 from .pugoing_api.api import (
     control_device,
     execute_scene,
-    login as pugoing_login,
     process_rooms,
 )
-from .pugoing_api.const import Dkey, Dpanel
+from .pugoing_api.api import (
+    login as pugoing_login,
+)
+from .pugoing_api.const import Dkey
+
+if TYPE_CHECKING:
+    from aiohttp import ClientSession
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -25,26 +28,26 @@ TOKEN_BUF = 5 * 60             # 过期前 5 分钟自动续
 
 # ---------------- 自定义异常 ---------------- #
 class IntegrationBlueprintApiClientError(Exception):
-    """API 统一异常基类。"""
+    """API 统一异常基类."""
 
 
 class IntegrationBlueprintApiClientCommunicationError(IntegrationBlueprintApiClientError):
-    """通信异常（如超时、解析失败）。"""
+    """通信异常(如超时,解析失败)."""
 
 
 class IntegrationBlueprintApiClientAuthenticationError(IntegrationBlueprintApiClientError):
-    """鉴权失败异常（用户名密码错误等）。"""
+    """鉴权失败异常(用户名密码错误等)."""
 
 
 # ---------------- 客户端主体 ---------------- #
 class IntegrationBlueprintApiClient:
-    """封装 PuGoing 登录与设备拉取/控制逻辑。"""
+    """封装 PuGoing 登录与设备拉取/控制逻辑."""
 
     def __init__(
         self,
         username: str,
         password: str,
-        session: aiohttp.ClientSession,
+        session: ClientSession,
     ) -> None:
         self._username = username
         self._password = password
@@ -54,9 +57,9 @@ class IntegrationBlueprintApiClient:
         self._token_ts: float | None = None     # token 获取时间戳
 
     # ====== 主流程入口 ====== #
-    async def async_get_data(self) -> Dict[str, Any]:
+    async def async_get_data(self) -> dict[str, Any]:
         """
-        返回结构：
+        返回结构:
         {
             "devices_by_type": { "Lamp": [...], "Switch": [...], ... },
             "scenes_by_sn": { "10D07A48A61A": [ {...}, {...} ] },
@@ -75,8 +78,8 @@ class IntegrationBlueprintApiClient:
         }
 
     # ====== 拉设备列表 ====== #
-    async def _async_fetch_devices(self) -> Dict[str, List[dict]]:
-        """拿到分类好的设备列表。"""
+    async def _async_fetch_devices(self) -> dict[str, list[dict]]:
+        """拿到分类好的设备列表."""
         _LOGGER.debug("Fetching device list with token %s", self._token)
         try:
             async with async_timeout.timeout(15):
@@ -87,7 +90,7 @@ class IntegrationBlueprintApiClient:
 
     # ====== 登录流程 ====== #
     async def _async_login(self) -> None:
-        """登录并缓存 token。"""
+        """登录并缓存 token."""
         _LOGGER.debug("Logging in as %s", self._username)
         try:
             async with async_timeout.timeout(10):
@@ -99,7 +102,7 @@ class IntegrationBlueprintApiClient:
             raise IntegrationBlueprintApiClientAuthenticationError(str(exc)) from exc
 
     async def _async_ensure_token(self) -> None:
-        """如果 token 不存在或即将过期则自动续。"""
+        """如果 token 不存在或即将过期则自动续."""
         if (
             self._token is None
             or self._token_ts is None
@@ -109,7 +112,7 @@ class IntegrationBlueprintApiClient:
         # ====== 控制断路器 ====== #
 
     async def async_set_breaker_state(self, device_id: str, sn: str, on: bool) -> None:
-        """设置断路器设备状态（开/关）。"""
+        """设置断路器设备状态(开/关)."""
         await self._async_ensure_token()
 
         key = Dkey.DLQ_OPEN if on else Dkey.DLQ_CLOSE
@@ -123,7 +126,7 @@ class IntegrationBlueprintApiClient:
                     key,
                     device_id,
                     self._token,
-                    None,  # 断路器只要开关，不需要额外参数
+                    None,  # 断路器只要开关,不需要额外参数
                 )
                 _LOGGER.info(
                     "Breaker control successful: %s (device=%s, on=%s)",
@@ -135,22 +138,22 @@ class IntegrationBlueprintApiClient:
             _LOGGER.error("Failed to control breaker %s: %s", device_id, e)
             raise IntegrationBlueprintApiClientCommunicationError(str(e)) from e
 
-    # ====== 控制灯光（开关） ====== #
+    # ====== 控制灯光(开关) ====== #
     async def async_set_lamp_state(
         self,
         device_id: str,
         sn: str,
         on: bool,
-        brightness: int | None = None,  # 预留参数，暂不处理
+        brightness: int | None = None,  # 预留参数,暂不处理
     ) -> None:
-        """设置灯光设备状态（目前仅支持开关）。"""
+        """设置灯光设备状态(目前仅支持开关)."""
         await self._async_ensure_token()
 
         key = Dkey.LAMP_OPEN if on else Dkey.LAMP_CLOSE
 
         try:
             async with async_timeout.timeout(10):
-                result = await control_device(sn, 'uip', "", key, device_id, self._token, None)
+                result = await control_device(sn, "uip", "", key, device_id, self._token, None)
                 _LOGGER.info("Device control successful: %s", result)
         except Exception as e:
             _LOGGER.error("Failed to control lamp %s: %s", device_id, e)
@@ -166,13 +169,13 @@ class IntegrationBlueprintApiClient:
         rgb_hex: str | None = None,  # "FF0000"
     ) -> None:
         """
-        设置调光调色灯状态：
-        - 开关：on=True/False
-        - 亮度：传 0-100，实际值=整数✖2.54
-        - 色温：支持两种格式：
-            * 开尔文值：如 1377, 2000-6535
-            * 百分比：0-100，实际值=(整数✖3.47)+153
-        - RGB：传 hex 字符串，比如 "FF0000"
+        设置调光调色灯状态:
+        - 开关:on=True/False
+        - 亮度:传 0-100,实际值=整数✖2.54
+        - 色温:支持两种格式:
+            * 开尔文值:如 1377, 2000-6535
+            * 百分比:0-100,实际值=(整数✖3.47)+153
+        - RGB:传 hex 字符串,比如 "FF0000"
         """
         await self._async_ensure_token()
 
@@ -213,7 +216,7 @@ class IntegrationBlueprintApiClient:
         if color_temp is not None:
             # 判断是开尔文值还是百分比
             if 2000 <= color_temp <= 6535:  # 开尔文值范围
-                # 将开尔文值转换为设备需要的格式: (开尔文值 - 153) / 3.47
+                # Convert Kelvin values to the device format: (Kelvin - 153) / 3.47.
                 cct_value = str(int((color_temp - 153) / 3.47))
                 tasks.append((Dkey.LAMP_CCT, cct_value))
                 _LOGGER.debug(
@@ -259,7 +262,7 @@ class IntegrationBlueprintApiClient:
             "Prepared %d control tasks for device %s: %s", len(tasks), device_id, tasks
         )
 
-        # 如果没有任务，提前返回
+        # 如果没有任务,提前返回
         if not tasks:
             _LOGGER.warning("No control tasks to execute for device %s", device_id)
             return
@@ -295,7 +298,7 @@ class IntegrationBlueprintApiClient:
                 "All control tasks completed successfully for device %s", device_id
             )
 
-        except asyncio.TimeoutError:
+        except TimeoutError:
             _LOGGER.error("Control timeout for device %s after 10 seconds", device_id)
             raise IntegrationBlueprintApiClientCommunicationError(
                 "Control timeout"
@@ -316,75 +319,7 @@ class IntegrationBlueprintApiClient:
     #     self,
     #     device_id: str,
     #     sn: str,
-    #     on: bool | None = None,  # 开关
-    #     brightness: int | None = None,  # 0-100
-    #     color_temp: int | None = None,  # 0-100
-    #     rgb_hex: str | None = None,  # "FF0000"
-    # ) -> None:
-    #     """
-    #     设置调光调色灯状态：
-    #     - 开关：on=True/False
-    #     - 亮度：传 0-100，实际值=整数✖2.54
-    #     - 色温：传 0-100，实际值=(整数✖3.47)+153
-    #     - RGB：传 hex 字符串，比如 "FF0000"
-    #     """
-    #     await self._async_ensure_token()
-
-    #     tasks: list[tuple[str, str | None]] = []
-
-    #     # 开关
-    #     if on is True:
-    #         tasks.append((Dkey.LAMP_OPEN, None))
-    #     elif on is False:
-    #         tasks.append((Dkey.LAMP_CLOSE, None))
-
-    #     # 亮度
-    #     if brightness is not None:
-    #         if 0 <= brightness <= 100:
-    #             bri_value = str(int(brightness * 2.54))
-    #             tasks.append((Dkey.LAMP_BRI, bri_value))
-    #         else:
-    #             raise ValueError("Brightness must be 0-100")
-
-    #     # 色温
-    #     if color_temp is not None:
-    #         if 0 <= color_temp <= 100:
-    #             cct_value = str(int(color_temp * 3.47 + 153))
-    #             tasks.append((Dkey.LAMP_CCT, cct_value))
-    #         else:
-    #             raise ValueError("Color temp must be 0-100")
-
-    #     # RGB
-    #     if rgb_hex is not None:
-    #         if len(rgb_hex) == 6:  # 简单校验
-    #             tasks.append((Dkey.LAMP_RGB, rgb_hex.upper()))
-    #         else:
-    #             raise ValueError("RGB must be a 6-digit hex string, e.g., 'FF0000'")
-
-    #     # 执行控制
-    #     try:
-    #         async with async_timeout.timeout(10):
-    #             for key, extra in tasks:
-    #                 result = await control_device(
-    #                     sn,
-    #                     "uip",
-    #                     "",
-    #                     key,
-    #                     device_id,
-    #                     self._token,
-    #                     extra,
-    #                 )
-    #                 _LOGGER.info(
-    #                     "Dimmer control: key=%s extra=%s result=%s",
-    #                     key,
-    #                     extra,
-    #                     result,
-    #                 )
-    #     except Exception as e:
-    #         _LOGGER.error("Failed to control dimmer lamp %s: %s", device_id, e)
-    #         raise IntegrationBlueprintApiClientCommunicationError(str(e)) from e
-
-    # ====== 控制窗帘（开关） ====== #
+    # ====== 控制窗帘(开关) ====== #
     async def async_set_curtain_state(
         self,
         device_id: str,
@@ -392,7 +327,7 @@ class IntegrationBlueprintApiClient:
         action: str | None = None,  # "open" / "close" / "stop"
         position: int | None = None,  # 0-100
     ) -> None:
-        """设置窗帘设备状态（支持开、关、暂停、定位）。"""
+        """设置窗帘设备状态(支持开,关,暂停,定位)."""
         await self._async_ensure_token()
 
         # -------- key 映射 -------- #
@@ -411,10 +346,10 @@ class IntegrationBlueprintApiClient:
             )
 
         # -------- 附加参数 -------- #
-        # 一般卷帘定位需要传百分比位置，这里可以塞进 value 或 extra 参数
+        # 一般卷帘定位需要传百分比位置,这里可以塞进 value 或 extra 参数
         extra_value = None
         if key == Dkey.CL_POS and position is not None:
-            extra_value = str(position)  # 设备协议需要百分比字符串，比如 "65"
+            extra_value = str(position)  # 设备协议需要百分比字符串,比如 "65"
 
         try:
             async with async_timeout.timeout(10):
@@ -426,7 +361,7 @@ class IntegrationBlueprintApiClient:
                     device_id,
                     self._token,
                     extra_value or None,
-                )        
+                )
                 _LOGGER.info(
                     "Curtain control successful: %s (action=%s pos=%s)",
                     result,
@@ -452,17 +387,17 @@ class IntegrationBlueprintApiClient:
             _LOGGER.error("Failed to execute scene sn=%s sid=%s: %s", sn, sid, e)
             raise IntegrationBlueprintApiClientCommunicationError(str(e)) from e
 
-    # ====== 控制空调（VRV） ====== #
+    # ====== 控制空调(VRV) ====== #
     async def async_set_vrv_state(
         self,
         device_id: str,
         sn: str,
-        power: bool | None = None,  # True=开，False=关
+        power: bool | None = None,  # True=开,False=关
         mode: str | None = None,  # "cool" / "heat" / "dry" / "fan_only"
         fan_mode: str | None = None,  # "high" / "medium" / "low"
         temperature: int | None = None,  # 16-30
     ) -> None:
-        """设置空调状态：开关/模式/风速/温度。"""
+        """设置空调状态:开关/模式/风速/温度."""
         await self._async_ensure_token()
 
         tasks = []

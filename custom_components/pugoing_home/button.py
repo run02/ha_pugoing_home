@@ -1,9 +1,10 @@
 # custom_components/integration_blueprint/button.py
 
 from __future__ import annotations
-from datetime import datetime, timedelta
+
 import logging
-from typing import Any, TYPE_CHECKING
+from datetime import datetime, timedelta
+from typing import TYPE_CHECKING, Any
 
 from homeassistant.components.button import ButtonEntity
 from homeassistant.helpers import entity_registry as er
@@ -16,6 +17,7 @@ from .pugoing_api.error import PuGoingAPIError
 if TYPE_CHECKING:
     from homeassistant.core import HomeAssistant
     from homeassistant.helpers.entity_platform import AddEntitiesCallback
+
     from .coordinator import BlueprintDataUpdateCoordinator
     from .data import IntegrationBlueprintConfigEntry
 
@@ -91,7 +93,7 @@ async def async_setup_entry(
                 entities_by_sid.pop(sid, None)
             known_ids.difference_update(removed_ids)
 
-        # 更新：触发场景变化检测
+        # Trigger updates so scene changes are detected.
         for sn, scenes in scenes_by_sn.items():
             for sc in scenes:
                 sid = sc["sid"]
@@ -104,9 +106,9 @@ async def async_setup_entry(
 # ----------------------------- entity ----------------------------------- #
 # ----------------------------- entity ----------------------------------- #
 class PuGoingSceneButton(IntegrationBlueprintEntity, ButtonEntity):
-    """无状态场景按钮，按下即触发场景。"""
+    """无状态场景按钮,按下即触发场景."""
 
-    DEBOUNCE_INTERVAL = timedelta(seconds=BUTTON_STATE_DEBOUNCE_SECONDS)  # 消抖时间，可调
+    DEBOUNCE_INTERVAL = timedelta(seconds=BUTTON_STATE_DEBOUNCE_SECONDS)  # 消抖时间,可调
 
     def __init__(self, coordinator, sn: str, scene: dict[str, Any]):
         super().__init__(coordinator)
@@ -120,7 +122,7 @@ class PuGoingSceneButton(IntegrationBlueprintEntity, ButtonEntity):
         self._last_trigger: datetime | None = None  # 上次触发时间
 
     def _can_trigger(self) -> bool:
-        """是否允许触发（消抖逻辑）"""
+        """是否允许触发(消抖逻辑)"""
         now = datetime.now()
         if self._last_trigger and (now - self._last_trigger) < self.DEBOUNCE_INTERVAL:
             _LOGGER.debug(
@@ -137,7 +139,7 @@ class PuGoingSceneButton(IntegrationBlueprintEntity, ButtonEntity):
         if not self._can_trigger():
             return
         try:
-            # 记录一次“手动”状态，避免下次刷新误触发
+            # 记录一次“手动”状态,避免下次刷新误触发
 
             _LOGGER.info("Last sinfo: %s", self._last_sinfo)
             self._last_sinfo = f"{datetime.now().strftime('%m/%d %H:%M')} 手动"
@@ -155,15 +157,15 @@ class PuGoingSceneButton(IntegrationBlueprintEntity, ButtonEntity):
         """从 coordinator 更新时检测 sinfo 变化并触发"""
         if not self._can_trigger():
                 return
-        
+
         new_sinfo = new_scene.get("sinfo", "")
-        
+
         if new_sinfo and new_sinfo != self._last_sinfo:
 
-            
+
             _LOGGER.info("New sinfo: %s", new_sinfo)
             _LOGGER.info("Last sinfo: %s", self._last_sinfo)
-            
+
             self._last_sinfo = new_sinfo
             self._scene = new_scene
             _LOGGER.info("Scene %s triggered from update: %s", self._sid, new_sinfo)
@@ -171,7 +173,7 @@ class PuGoingSceneButton(IntegrationBlueprintEntity, ButtonEntity):
             self.hass.async_create_task(self.async_press_effect())
 
     async def async_press_effect(self):
-        """只更新 HA 状态，不调用 API"""
+        """只更新 HA 状态,不调用 API"""
         self.async_write_ha_state()
 
     @property
@@ -185,7 +187,7 @@ class PuGoingSceneButton(IntegrationBlueprintEntity, ButtonEntity):
 
     @property
     def device_info(self) -> DeviceInfo:
-        """让每个场景按钮单独成设备。"""
+        """让每个场景按钮单独成设备."""
         return DeviceInfo(
             identifiers={(DOMAIN, f"scene_{self._sid}")},
             name=self._scene.get("sna") or f"Scene {self._sid}",

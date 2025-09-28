@@ -1,29 +1,34 @@
-"""Light platform for PuGoing integration (integration_blueprint).
+"""
+Light platform for PuGoing integration (integration_blueprint).
 
 Dynamic add/remove Lamp entities using DataUpdateCoordinator.
 """
 
 from __future__ import annotations
 
-from datetime import datetime, timedelta
 import logging
+from datetime import datetime, timedelta
 from typing import TYPE_CHECKING, Any
 
 from homeassistant.components.light import (
-    ColorMode,
-    LightEntity,
     ATTR_BRIGHTNESS,
-    ATTR_COLOR_TEMP_KELVIN as ATTR_COLOR_TEMP,
     ATTR_RGB_COLOR,
     DEFAULT_MAX_KELVIN,
     DEFAULT_MIN_KELVIN,
+    ColorMode,
+    LightEntity,
+)
+from homeassistant.components.light import (
+    ATTR_COLOR_TEMP_KELVIN as ATTR_COLOR_TEMP,
+)
+from homeassistant.helpers import (
+    area_registry as ar,
+)
+from homeassistant.helpers import (
+    device_registry as dr,
 )
 from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers.device_registry import DeviceInfo
-from homeassistant.helpers import (
-    area_registry as ar,
-    device_registry as dr,
-)
 
 from .const import DOMAIN, LAMP_STATE_DEBOUNCE_SECONDS
 from .entity import IntegrationBlueprintEntity
@@ -51,7 +56,7 @@ async def async_setup_entry(
     known_ids: set[str] = set()
 
     def _create_entity(dev: dict[str, Any]):
-        # dpanel 来区分：普通灯 / 调光灯
+        # dpanel 来区分:普通灯 / 调光灯
         if dev.get("dpanel") == "LampRGBCW":
             return PuGoingRGBCWLight(coordinator, dev)
         return PuGoingLampLight(coordinator, dev)
@@ -198,7 +203,7 @@ class PuGoingLampLight(IntegrationBlueprintEntity, LightEntity):
 
     @property
     def device_info(self) -> DeviceInfo:
-        """让每盏灯各自成为一个设备。"""
+        """让每盏灯各自成为一个设备."""
         dev = self._latest() or {}
         return DeviceInfo(
             identifiers={(DOMAIN, self._device_id)},
@@ -207,9 +212,9 @@ class PuGoingLampLight(IntegrationBlueprintEntity, LightEntity):
             model=dev.get("dpanel", "Lamp"),
         )
 
-    # ---------- HA 回调：实体已加入 ---------------- #
+    # ---------- HA 回调:实体已加入 ---------------- #
     async def async_added_to_hass(self) -> None:
-        """实体注册完成后，自动把设备归到对应区域。"""
+        """实体注册完成后,自动把设备归到对应区域."""
         await super().async_added_to_hass()
 
         area_name = (self._latest() or {}).get("dloca")
@@ -229,7 +234,7 @@ class PuGoingLampLight(IntegrationBlueprintEntity, LightEntity):
 
 # ----------------------------- entity: RGBCW 调光调色灯 --------------------------- #
 class PuGoingRGBCWLight(PuGoingLampLight):
-    """调光调色灯，支持亮度、色温、RGB。"""
+    """调光调色灯,支持亮度,色温,RGB."""
 
     _attr_supported_color_modes = {
         ColorMode.BRIGHTNESS,
@@ -261,7 +266,6 @@ class PuGoingRGBCWLight(PuGoingLampLight):
 
         try:
             power_hex = data[:2]
-            mode_hex = data[2:4]
             brightness_hex = data[4:6]
             color_temp_hex = data[6:8]
             r_hex, g_hex, b_hex = data[8:10], data[10:12], data[12:14]
@@ -278,22 +282,22 @@ class PuGoingRGBCWLight(PuGoingLampLight):
                 round(int(b_hex, 16) / 100 * 255),
             )
 
-            # 消抖逻辑：如果在手动操作后的 10 秒内，忽略 coordinator 下发的数据
+            # 消抖逻辑:如果在手动操作后的 10 秒内,忽略 coordinator 下发的数据
             if (
                 self._last_manual_control
                 and datetime.now() - self._last_manual_control < timedelta(seconds=10)
             ):
                 return
 
-            # 否则，更新状态
+            # 否则,更新状态
             self._state = new_state
             self._brightness = new_brightness
             self._color_temp = new_color_temp
             self._rgb_color = new_rgb
             self._last_update = datetime.now()
 
-        except Exception as e:
-            _LOGGER.debug("Failed to parse RGBCW data: %s", e)
+        except (ValueError, IndexError) as err:
+            _LOGGER.debug("Failed to parse RGBCW data: %s", err)
 
     def _latest(self) -> dict[str, Any] | None:
         for dev in self.coordinator.data.get("devices_by_type", {}).get(

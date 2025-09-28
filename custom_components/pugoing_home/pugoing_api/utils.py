@@ -10,7 +10,7 @@ class LoggerUtility:
 
         # 处理日志输出
         handler = logging.StreamHandler(sys.stdout)
-        formatter = logging.Formatter('%(levelname)s - %(message)s')  # 不带时间戳
+        formatter = logging.Formatter("%(levelname)s - %(message)s")  # 不带时间戳
         handler.setFormatter(formatter)
         handler.setLevel(log_level)  # 设置日志的打印级别
         self.logger.addHandler(handler)
@@ -18,7 +18,7 @@ class LoggerUtility:
         # 防止重复添加 handler
         self.logger.propagate = False
 
-    # 日志方法，拼接传入的 *args
+    # 日志方法,拼接传入的 *args
     def info(self, *args, **kwargs):
         message = " ".join(str(arg) for arg in args)  # 将 *args 转换为字符串并拼接
         self.logger.info(message, **kwargs)
