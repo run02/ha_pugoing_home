@@ -1,27 +1,29 @@
-"""Cover platform for PuGoing integration (integration_blueprint).
+"""
+Cover platform for PuGoing integration (integration_blueprint).
 
 Dynamic add/remove Curtain entities using DataUpdateCoordinator.
 """
 
 from __future__ import annotations
 
-from datetime import datetime, timedelta
 import logging
+from datetime import datetime, timedelta
 from typing import TYPE_CHECKING, Any
 
 from homeassistant.components.cover import (
     CoverEntity,
     CoverEntityFeature,
-    STATE_OPEN,
-    STATE_CLOSED,
+)
+from homeassistant.helpers import (
+    area_registry as ar,
+)
+from homeassistant.helpers import (
+    device_registry as dr,
 )
 from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers.device_registry import DeviceInfo
-from homeassistant.helpers import (
-    area_registry as ar,
-    device_registry as dr,
-)
-from .const import DOMAIN, CURTAIN_STATE_DEBOUNCE_SECONDS
+
+from .const import CURTAIN_STATE_DEBOUNCE_SECONDS, DOMAIN
 from .entity import IntegrationBlueprintEntity
 from .pugoing_api.error import PuGoingAPIError
 
@@ -126,7 +128,7 @@ class PuGoingCurtain(IntegrationBlueprintEntity, CoverEntity):
         if "打开" in dinfo and "%" in dinfo:
             try:
                 return int(dinfo.split("打开")[1].replace("%", ""))
-            except Exception:
+            except (IndexError, ValueError):
                 return None
         elif "关闭" in dinfo:
             return 0
@@ -227,7 +229,7 @@ class PuGoingCurtain(IntegrationBlueprintEntity, CoverEntity):
 
     @property
     def device_info(self) -> DeviceInfo:
-        """让每个窗帘各自成为一个设备。"""
+        """让每个窗帘各自成为一个设备."""
         dev = self._latest() or {}
         return DeviceInfo(
             identifiers={(DOMAIN, self._device_id)},
@@ -236,9 +238,9 @@ class PuGoingCurtain(IntegrationBlueprintEntity, CoverEntity):
             model=dev.get("dpanel", "CurtainPG"),
         )
 
-    # ---------- HA 回调：实体已加入 ---------------- #
+    # ---------- HA 回调:实体已加入 ---------------- #
     async def async_added_to_hass(self) -> None:
-        """实体注册完成后，自动把设备归到对应区域。"""
+        """实体注册完成后,自动把设备归到对应区域."""
         await super().async_added_to_hass()
 
         area_name = (self._latest() or {}).get("dloca")

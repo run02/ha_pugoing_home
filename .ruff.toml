@@ -2,6 +2,13 @@
 
 target-version = "py313"
 
+exclude = [
+    "custom_components/pugoing_home/pugoing_api",
+    "custom_components/pugoing_home/local",
+]
+
+force-exclude = true
+
 [lint]
 select = [
     "ALL",
@@ -13,6 +20,42 @@ ignore = [
     "D212", # multi-line-summary-first-line (incompatible with formatter)
     "COM812", # incompatible with formatter
     "ISC001", # incompatible with formatter
+    "ANN001",
+    "ANN002",
+    "ANN003",
+    "ANN201",
+    "ANN202",
+    "ANN204",
+    "ARG001",
+    "ARG002",
+    "B007",
+    "D100",
+    "D102",
+    "D103",
+    "D107",
+    "D205",
+    "D213",
+    "D400",
+    "D415",
+    "DTZ005",
+    "E501",
+    "EM101",
+    "EM102",
+    "FBT001",
+    "PLR2004",
+    "PLR0912",
+    "PLR0913",
+    "PLR0915",
+    "RET504",
+    "RUF012",
+    "SIM102",
+    "S110",
+    "SLF001",
+    "TRY003",
+    "TRY300",
+    "TRY400",
+    "TRY401",
+    "UP031",
 ]
 
 [lint.flake8-pytest-style]

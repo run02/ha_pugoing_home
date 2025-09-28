@@ -1,12 +1,13 @@
 import asyncio
-import aiohttp
 import json
 import logging
-from datetime import datetime
 from collections import defaultdict
-from .const import selectedUrls, DEVELOPING, api_version
-from .utils import LoggerUtility
+
+import aiohttp
+
+from .const import api_version, selectedUrls
 from .error import DeviceOfflineError, NoPermissionError, PuGoingInvalidResponseError
+from .utils import LoggerUtility
 
 # lib_logger = LoggerUtility(name="lib_logger", log_level=logging.DEBUG)
 lib_logger = LoggerUtility(name="lib_logger", log_level=logging.INFO)
@@ -38,13 +39,12 @@ async def fetch_device_by_yid(token, sn, yid) -> dict:
                     device_info = result["data"]["ackinfo"]
                     if isinstance(device_info, list) and len(device_info) > 0:
                         return device_info[0]
-                    else:
-                        raise PuGoingInvalidResponseError("查询设备状态时应答的数据为空")
-                elif result.get("ack") == 0:
+                    raise PuGoingInvalidResponseError("查询设备状态时应答的数据为空")
+                if result.get("ack") == 0:
                     error_message = result.get("msg", "Unknown error")
                     if error_message == "主机不在线":
                         raise DeviceOfflineError()
-                    elif error_message == "您没有此权限访问该主机":
+                    if error_message == "您没有此权限访问该主机":
                         raise NoPermissionError()
                     lib_logger.error(f"Request failed with message: {error_message}")
                 else:
@@ -66,9 +66,8 @@ async def fetch_sn_list(token):
             result = await response.json()
             if result.get("ack") == 1:
                 return result["data"]["list"]
-            else:
-                lib_logger.error(f"Request failed with message: {result.get('msg')}")
-                raise Exception(f"Request failed with message: {result.get('msg')}")
+            lib_logger.error(f"Request failed with message: {result.get('msg')}")
+            raise Exception(f"Request failed with message: {result.get('msg')}")
 
 
 async def fetch_devices_by_room(token, sn, room_name):
@@ -82,9 +81,8 @@ async def fetch_devices_by_room(token, sn, room_name):
             result = await response.json()
             if result.get("ack") == 1:
                 return result["data"]["list"]
-            else:
-                lib_logger.error(f"Request failed with message: {result.get('msg')}")
-                raise Exception(f"Request failed with message: {result.get('msg')}")
+            lib_logger.error(f"Request failed with message: {result.get('msg')}")
+            raise Exception(f"Request failed with message: {result.get('msg')}")
 
 async def fetch_scenes_by_sn(token: str, sn: str):
     """根据主机 SN 获取场景列表"""
@@ -99,14 +97,13 @@ async def fetch_scenes_by_sn(token: str, sn: str):
                 result = await response.json()
                 if result.get("ack") == 1:
                     return result["data"]["list"]
-                else:
-                    error_message = result.get("msg", "Unknown error")
-                    if error_message == "主机不在线":
-                        raise DeviceOfflineError()
-                    elif error_message == "您没有此权限访问该主机":
-                        raise NoPermissionError()
-                    lib_logger.error(f"fetch_scenes_by_sn failed: {error_message}")
-                    return []
+                error_message = result.get("msg", "Unknown error")
+                if error_message == "主机不在线":
+                    raise DeviceOfflineError()
+                if error_message == "您没有此权限访问该主机":
+                    raise NoPermissionError()
+                lib_logger.error(f"fetch_scenes_by_sn failed: {error_message}")
+                return []
         except Exception as e:
             lib_logger.error(f"Error during fetch_scenes_by_sn: {e}")
             raise e
@@ -130,7 +127,7 @@ async def control_device(sn, fm, dvcm, dkey, yid, token, digv=None):
                 error_message = result.get("msg", "Unknown error")
                 if error_message == "主机不在线":
                     raise DeviceOfflineError()
-                elif error_message == "您没有此权限访问该主机":
+                if error_message == "您没有此权限访问该主机":
                     raise NoPermissionError()
                 lib_logger.error(f"Request failed with message: {result.get('msg')}")
             else:
@@ -149,9 +146,8 @@ async def fetch_sn_and_room_list(token):
             result = await response.json()
             if result.get("ack") == 1:
                 return result["data"]["list"]
-            else:
-                lib_logger.error(f"Request failed with message: {result.get('msg')}")
-                raise Exception(f"Request failed with message: {result.get('msg')}")
+            lib_logger.error(f"Request failed with message: {result.get('msg')}")
+            raise Exception(f"Request failed with message: {result.get('msg')}")
 
 
 async def categorize_devices_by_panel(token, sn, room_name):
@@ -195,7 +191,7 @@ async def process_rooms(token):
             if scenes:
                 scenes_all[sn] = scenes
         except Exception as e:
-            lib_logger.error(f"Error fetching scenes for sn {sn}: {str(e)}")
+            lib_logger.error(f"Error fetching scenes for sn {sn}: {e!s}")
 
         # 获取设备
         room_list = sn_room["room"]
@@ -205,7 +201,7 @@ async def process_rooms(token):
                 if devices:
                     devices_all.append(devices)
             except Exception as e:
-                lib_logger.error(f"Error processing room {room['name']}: {str(e)}")
+                lib_logger.error(f"Error processing room {room['name']}: {e!s}")
 
     lib_logger.debug("Processed devices:", json.dumps(devices_all, ensure_ascii=False))
     lib_logger.debug("Processed scenes:", json.dumps(scenes_all, ensure_ascii=False))
@@ -233,7 +229,7 @@ async def get_devices_by_hotel_room_name(name: str, token: str) -> dict:
 
     room_list = next((item.get("room", []) for item in sn_room_list if item.get("sn") == sn), [])
 
-    tasks = [categorize_devices_by_panel(token, sn, room['name']) for room in room_list]
+    tasks = [categorize_devices_by_panel(token, sn, room["name"]) for room in room_list]
     devices_all = []
 
     try:
@@ -242,7 +238,7 @@ async def get_devices_by_hotel_room_name(name: str, token: str) -> dict:
             if devices:
                 devices_all.append(devices)
     except Exception as e:
-        lib_logger.error(f"Error processing rooms: {str(e)}")
+        lib_logger.error(f"Error processing rooms: {e!s}")
 
     return merge_dicts(devices_all)
 
@@ -259,9 +255,8 @@ async def login(username: str, password: str):
             result = await response.json()
             if result.get("ack") == 1:
                 return result["data"]["token"]
-            else:
-                lib_logger.error(f"Login failed with message: {result.get('msg')}")
-                raise Exception(f"Login failed with message: {result.get('msg')}")
+            lib_logger.error(f"Login failed with message: {result.get('msg')}")
+            raise Exception(f"Login failed with message: {result.get('msg')}")
 async def execute_scene(token: str, sn: str, sid: str) -> dict:
     """执行指定场景"""
     data = build_token_payload(token, {"sn": sn, "sid": sid})
@@ -278,10 +273,9 @@ async def execute_scene(token: str, sn: str, sid: str) -> dict:
                 result = await response.json()
                 if result.get("ack") == 1:
                     return result
-                else:
-                    error_message = result.get("msg", "Unknown error")
-                    lib_logger.error(f"Execute scene failed: {error_message}")
-                    raise PuGoingInvalidResponseError(error_message)
+                error_message = result.get("msg", "Unknown error")
+                lib_logger.error(f"Execute scene failed: {error_message}")
+                raise PuGoingInvalidResponseError(error_message)
         except Exception as e:
             lib_logger.error(f"Error during execute_scene: {e}")
             raise e

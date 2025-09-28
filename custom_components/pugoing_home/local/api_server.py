@@ -1,10 +1,8 @@
-from homeassistant.components.http import HomeAssistantView
-from homeassistant.components import http
-from aiohttp import web
-
-from homeassistant.helpers import entity_registry as er
-
 import logging
+
+from aiohttp import web
+from homeassistant.components.http import HomeAssistantView
+from homeassistant.helpers import entity_registry as er
 
 _LOGGER = logging.getLogger(__name__)
 def get_entity_by_device_id(hass, device_id: str):
@@ -13,7 +11,7 @@ def get_entity_by_device_id(hass, device_id: str):
     unique_id = f"{device_id}"
     entity_id = reg.async_get_entity_id("light", "pugoing_home", unique_id)
     if entity_id:
-        return hass.states.get(entity_id)  # 返回状态对象，可以取 attributes
+        return hass.states.get(entity_id)  # 返回状态对象,可以取 attributes
     return None
 
 
@@ -40,7 +38,7 @@ class PuGoingApiSub2View(HomeAssistantView):
         return web.json_response({"message": "Sub2 endpoint"})
 
 class PuGoingApiPublishView(HomeAssistantView):
-    """接收外部调用的 Publish API，例如：开灯/关灯 or 仅更新状态"""
+    """接收外部调用的 Publish API,例如:开灯/关灯 or 仅更新状态"""
 
     url = "/pugoing_ha/publish"
     name = "pugoing_ha_publish"
@@ -70,38 +68,37 @@ class PuGoingApiPublishView(HomeAssistantView):
             )
         dpanel = dev.attributes.get("dpanel", "Unknown")
         print(f"dpanel: {dpanel}")
-        
+
         entity_id = dev.entity_id
         new_state = "on" if action.lower() in ("on", "open", "1") else "off"
         if dpanel == "Lamp":
             print("is lamp")
         try:
             if act == "update":
-                # 仅更新状态，不调用服务
+                # 仅更新状态,不调用服务
                 hass.states.async_set(
                     entity_id,
                     new_state,
                     dev.attributes,
                 )
                 msg = f"{entity_id} state updated to {new_state.upper()}"
+            # 默认 act=control,调用服务真正控制
+            elif new_state == "on":
+                await hass.services.async_call(
+                    "light",
+                    "turn_on",
+                    {"entity_id": entity_id},
+                    blocking=True,
+                )
+                msg = f"{entity_id} turned ON"
             else:
-                # 默认 act=control，调用服务真正控制
-                if new_state == "on":
-                    await hass.services.async_call(
-                        "light",
-                        "turn_on",
-                        {"entity_id": entity_id},
-                        blocking=True,
-                    )
-                    msg = f"{entity_id} turned ON"
-                else:
-                    await hass.services.async_call(
-                        "light",
-                        "turn_off",
-                        {"entity_id": entity_id},
-                        blocking=True,
-                    )
-                    msg = f"{entity_id} turned OFF"
+                await hass.services.async_call(
+                    "light",
+                    "turn_off",
+                    {"entity_id": entity_id},
+                    blocking=True,
+                )
+                msg = f"{entity_id} turned OFF"
 
             _LOGGER.info(msg)
             return web.json_response({"result": msg})

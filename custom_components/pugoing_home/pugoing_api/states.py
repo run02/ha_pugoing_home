@@ -51,7 +51,7 @@
 
 #     def __init__(self, state_str: str):
 #         """
-#         初始化空调控制器，直接从state_str加载状态
+#         初始化空调控制器,直接从state_str加载状态
 #         """
 #         self.state = None
 #         self.parse_air_conditioner_state(state_str)
@@ -83,7 +83,7 @@
 
 #     def parse_air_conditioner_state(self, state_str: str):
 #         """
-#         从状态字符串中提取空调状态，返回 AirConditionerState 对象。
+#         从状态字符串中提取空调状态,返回 AirConditionerState 对象.
 #         :param state_str: 类似于 "power:01;tem:28;mod:01;ws:04;rtem:20" 的状态字符串
 #         :return: AirConditionerState 对象
 #         """
@@ -93,9 +93,9 @@
 
 #         self.state = AirConditionerState(
 #             power="1" if state_dict.get("power") == "01" else "0",  # 电源状态转换为 "1" 或 "0"
-#             mode=str(int(state_dict.get("mod", "2"))),  # 默认模式为 "2"（制冷）
+#             mode=str(int(state_dict.get("mod", "2"))),  # 默认模式为 "2"(制冷)
 #             temperature=state_dict.get("tem", "25"),  # 默认温度为 "25"
-#             air_speed=str(int(state_dict.get("ws", "1"))),  # 默认风速为 "1"（自动风量）
+#             air_speed=str(int(state_dict.get("ws", "1"))),  # 默认风速为 "1"(自动风量)
 #             fan_direction=str(state_dict.get("rtem", "10"))[0],
 #             air_direction_auto=str(state_dict.get("rtem", "10"))[1]
 #         )
@@ -113,17 +113,17 @@
 
 #     def set_fan_direction(self, command_name: str):
 #         """
-#         根据风向控制命令调整风向，command_name 包含 SetUpWind、SetDownWind、SetUpAndDownWind。
+#         根据风向控制命令调整风向,command_name 包含 SetUpWind,SetDownWind,SetUpAndDownWind.
 #         """
 #         if command_name == "SetUpAndDownWind":
 #             # 设置为自动摆风模式
 #             self.state.fan_direction = AirConditionerController.AC_FAN_DIRECTION_AUTO
 #         else:
-#             # 获取当前的风向值，并将其转换为整数
+#             # 获取当前的风向值,并将其转换为整数
 #             current_direction = int(self.state.fan_direction)
 #             delta = AirConditionerController.FAN_DIRECTION_DELTA_MAPPING.get(command_name, 0)
 
-#             # 调整风向，并确保风向在上下（1-3）之间移动
+#             # 调整风向,并确保风向在上下(1-3)之间移动
 #             new_direction = current_direction + delta
 #             if new_direction < 1:
 #                 new_direction = 1
@@ -153,20 +153,20 @@
 #         return self.build_command()
 
 #     def set_temperature(self, temperature: int, scale: str = "CELSIUS"):
-#         # 如果是华氏度，则将其转换为摄氏度
+#         # 如果是华氏度,则将其转换为摄氏度
 #         if scale.upper() == "FAHRENHEIT":
 #             temperature = round((temperature - 32) * 5 / 9)  # 四舍五入成整数
 
-#         # 确保是两位整数的摄氏度，并转成字符串
+#         # 确保是两位整数的摄氏度,并转成字符串
 #         self.state.temperature = str(int(temperature)).zfill(2)
 #         return self.build_command()
 
 #     @classmethod
 #     def to_temperature(cls, temperature: int, scale: str = "CELSIUS"):
-#         # 如果是华氏度，则将其转换为摄氏度
+#         # 如果是华氏度,则将其转换为摄氏度
 #         if scale.upper() == "FAHRENHEIT":
 #             temperature = round((temperature - 32) * 5 / 9)  # 四舍五入成整数
-#         # 确保是两位整数的摄氏度，并转成字符串
+#         # 确保是两位整数的摄氏度,并转成字符串
 #         return str(int(temperature)).zfill(2)
 
 #     @classmethod
@@ -184,13 +184,13 @@
 
 #         # 根据 scale 来决定加减的单位
 #         if scale.upper() == "FAHRENHEIT":
-#             # 如果是华氏度，将调整的值转换为摄氏度再进行加减
+#             # 如果是华氏度,将调整的值转换为摄氏度再进行加减
 #             value = int(value * 5 / 9)
 
 #         # 调整后的温度
 #         new_temp = current_temp + value
 
-#         # 确保是两位整数的摄氏度，并转成字符串
+#         # 确保是两位整数的摄氏度,并转成字符串
 #         self.state.temperature = str(int(new_temp)).zfill(2)
 
 #         return self.build_command()
@@ -247,7 +247,7 @@
 #     saturation = hsb.get("saturation")
 #     brightness = hsb.get("brightness")
 
-#     # 使用 colorsys.hsv_to_rgb 将 HSB 转换为 RGB，结果为 0-1 之间的值
+#     # 使用 colorsys.hsv_to_rgb 将 HSB 转换为 RGB,结果为 0-1 之间的值
 #     r, g, b = colorsys.hsv_to_rgb(hue, saturation, brightness)
 
 #     # 将 RGB 转换为 0-255 范围的整数
@@ -255,7 +255,7 @@
 #     g = int(g * 255)
 #     b = int(b * 255)
 
-#     # 转换为十六进制字符串，不带 #
+#     # 转换为十六进制字符串,不带 #
 #     return f"{r:02x}{g:02x}{b:02x}"
 
 
@@ -284,7 +284,7 @@
 
 #     def parse_state(self):
 #         """
-#         解析 RGBCW 字符串，提取灯的状态、模式、亮度、色温和RGB值。
+#         解析 RGBCW 字符串,提取灯的状态,模式,亮度,色温和RGB值.
 #         :return: dict 包含灯的状态信息
 #         """
 #         if not self.raw_data.startswith("RGBCW:"):
@@ -295,7 +295,7 @@
 
 #         # 提取各个字段
 #         power_hex = data[:2]  # 04 或 03
-#         mode_hex = data[2:4]  # 04（RGB模式）或 03（色温和亮度模式）
+#         mode_hex = data[2:4]  # 04(RGB模式)或 03(色温和亮度模式)
 #         brightness_hex = data[4:6]  # 64(亮度)
 #         color_temp_hex = data[6:8]  # 63(色温)
 #         r_hex = data[8:10]  # 红色
@@ -313,7 +313,7 @@
 #         else:
 #             self.mode = "未知模式"
 
-#         # 解析亮度和色温（16进制转10进制）
+#         # 解析亮度和色温(16进制转10进制)
 #         self.brightness = int(brightness_hex, 16)
 
 #         self.color_temp_100 = int(color_temp_hex, 16)

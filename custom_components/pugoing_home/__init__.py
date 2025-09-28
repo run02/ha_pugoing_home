@@ -1,8 +1,7 @@
-# __init__.py
 """Custom integration to integrate integration_blueprint with Home Assistant.
 
 For more details about this integration, please refer to
-https://github.com/ludeeus/integration_blueprint
+https://github.com/ludeeus/integration_blueprint.
 """
 
 from __future__ import annotations
@@ -15,10 +14,10 @@ from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.loader import async_get_loaded_integration
 
 from .api import IntegrationBlueprintApiClient
+from .assist_mqtt_bridge import AssistMqttBridge
 from .const import DOMAIN, LOGGER, PUGOING_POLL_INTERVAL
 from .coordinator import BlueprintDataUpdateCoordinator
 from .data import IntegrationBlueprintData
-from .assist_mqtt_bridge import AssistMqttBridge
 from .local.api_server import PuGoingApiMainView, PuGoingApiPublishView
 
 if TYPE_CHECKING:
@@ -47,7 +46,6 @@ async def async_setup_entry(
         hass=hass,
         logger=LOGGER,
         name=DOMAIN,
-        # update_interval=timedelta(hours=1),
         update_interval=timedelta(seconds=PUGOING_POLL_INTERVAL),
     )
     bridge = AssistMqttBridge(hass)

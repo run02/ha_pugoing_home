@@ -1,28 +1,29 @@
-"""Binary Sensor platform for PuGoing integration (integration_blueprint).
+"""
+Binary Sensor platform for PuGoing integration (integration_blueprint).
 Dynamic add/remove Human Presence Sensors using DataUpdateCoordinator.
 """
 
 from __future__ import annotations
 
 import logging
-from datetime import datetime
 from typing import TYPE_CHECKING, Any
 
 from homeassistant.components.binary_sensor import (
-    BinarySensorEntity,
     BinarySensorDeviceClass,
+    BinarySensorEntity,
 )
+from homeassistant.helpers import area_registry as ar
+from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers.device_registry import DeviceInfo
-from homeassistant.helpers import area_registry as ar, device_registry as dr
 
 from .const import DOMAIN
 from .entity import IntegrationBlueprintEntity
-from .pugoing_api.error import PuGoingAPIError
 
 if TYPE_CHECKING:
     from homeassistant.core import HomeAssistant
     from homeassistant.helpers.entity_platform import AddEntitiesCallback
+
     from .coordinator import BlueprintDataUpdateCoordinator
     from .data import IntegrationBlueprintConfigEntry
 
@@ -157,7 +158,7 @@ class PuGoingHumanSensor(IntegrationBlueprintEntity, BinarySensorEntity):
 
     @property
     def device_info(self) -> DeviceInfo:
-        """让每个传感器各自成为一个设备。"""
+        """让每个传感器各自成为一个设备."""
         dev = self._latest() or {}
         return DeviceInfo(
             identifiers={(DOMAIN, self._device_id)},
@@ -166,9 +167,9 @@ class PuGoingHumanSensor(IntegrationBlueprintEntity, BinarySensorEntity):
             model=dev.get("dpanel", "HumanSensor"),
         )
 
-    # ---------- HA 回调：实体已加入 ---------------- #
+    # ---------- HA 回调:实体已加入 ---------------- #
     async def async_added_to_hass(self) -> None:
-        """实体注册完成后，自动把设备归到对应区域。"""
+        """实体注册完成后,自动把设备归到对应区域."""
         await super().async_added_to_hass()
         area_name = (self._latest() or {}).get("dloca")
         if not area_name:

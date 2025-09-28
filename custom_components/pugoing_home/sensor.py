@@ -1,4 +1,5 @@
-"""Sensor platform for IntelligentButler devices (PuGoing integration).
+"""
+Sensor platform for IntelligentButler devices (PuGoing integration).
 
 Creates temperature, humidity and illuminance sensors for every IntelligentButler
 physical device discovered by the coordinator. Each physical device is grouped
@@ -9,31 +10,35 @@ that device card.
 from __future__ import annotations
 
 import logging
-from typing import TYPE_CHECKING, Any, Dict, List, Set
+from typing import TYPE_CHECKING, Any
 
 from homeassistant.components.sensor import (
-    SensorEntity,
     SensorDeviceClass,
+    SensorEntity,
     SensorStateClass,
 )
 from homeassistant.const import (
-    UnitOfTemperature,
     PERCENTAGE,
+    UnitOfTemperature,
 )
 
-# UnitOfIlluminance 的位置在 2024.4+ 版本Moved到 homeassistant.const。
-# 为兼容旧版 HA，这里做一个 try/except 回退。
+# UnitOfIlluminance 的位置在 2024.4+ 版本Moved到 homeassistant.const.
+# 为兼容旧版 HA,这里做一个 try/except 回退.
 try:  # HA ≥2024.4
-    from homeassistant.const import UnitOfIlluminance  # type: ignore
-except ImportError:  # pragma: no cover – HA ≤2024.3
-    UnitOfIlluminance = None  # type: ignore
+    from homeassistant.const import UnitOfIlluminance
+except ImportError:  # pragma: no cover - HA ≤2024.3
+    UnitOfIlluminance = None
 
-from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers import (
     area_registry as ar,
-    device_registry as dr,
-    entity_registry as er,   # ← 增加 entity_registry 别名 er
 )
+from homeassistant.helpers import (
+    device_registry as dr,
+)
+from homeassistant.helpers import (
+    entity_registry as er,  # ← 增加 entity_registry 别名 er
+)
+from homeassistant.helpers.device_registry import DeviceInfo
 
 from .const import DOMAIN
 from .entity import IntegrationBlueprintEntity
@@ -51,17 +56,17 @@ _LOGGER = logging.getLogger(__name__)
 # Platform setup
 # -----------------------------------------------------------------------------
 async def async_setup_entry(
-    hass: "HomeAssistant",
-    entry: "IntegrationBlueprintConfigEntry",
-    async_add_entities: "AddEntitiesCallback",
+    hass: HomeAssistant,
+    entry: IntegrationBlueprintConfigEntry,
+    async_add_entities: AddEntitiesCallback,
 ) -> None:
     """Set up IntelligentButler sensors based on a config entry."""
     coordinator: BlueprintDataUpdateCoordinator = entry.runtime_data.coordinator
 
-    known_ids: Set[str] = set()  # 已创建实体的 yid
-    subscribed_ids: Set[str] = set()  # 已订阅的 xqid
+    known_ids: set[str] = set()  # 已创建实体的 yid
+    subscribed_ids: set[str] = set()  # 已订阅的 xqid
 
-    def _create_entities(dev: Dict[str, Any]):
+    def _create_entities(dev: dict[str, Any]):
         """Create three sensor entities (temp/hum/lum) for one physical device."""
         return [
             ButlerTempSensor(coordinator, dev),
@@ -71,16 +76,16 @@ async def async_setup_entry(
 
     async def _async_add_initial():
         """Add entities for devices already known at startup."""
-        butlers: List[Dict] = coordinator.data.get("devices_by_type", {}).get(
+        butlers: list[dict] = coordinator.data.get("devices_by_type", {}).get(
             "IntelligentButler", []
         )
-        entities: List[SensorEntity] = []
+        entities: list[SensorEntity] = []
         for dev in butlers:
             yid = dev["yid"]
             known_ids.add(yid)
             entities.extend(_create_entities(dev))
 
-            # 订阅 MQTT（避免重复）
+            # 订阅 MQTT(避免重复)
             xqid = dev.get("xqid")
             if xqid and xqid not in subscribed_ids:
                 entry.runtime_data.mqtt_bridge.subscribe_device(xqid)
@@ -97,15 +102,15 @@ async def async_setup_entry(
     # ------------------------ coordinator listener -------------------------#
     def _handle_butler_changes() -> None:
         """Handle runtime addition/removal of IntelligentButler devices."""
-        butlers_now: List[Dict] = coordinator.data.get("devices_by_type", {}).get(
+        butlers_now: list[dict] = coordinator.data.get("devices_by_type", {}).get(
             "IntelligentButler", []
         )
-        current_ids: Set[str] = {dev["yid"] for dev in butlers_now}
+        current_ids: set[str] = {dev["yid"] for dev in butlers_now}
 
         # ---------------- 新增设备 ----------------
         new_ids = current_ids - known_ids
         if new_ids:
-            new_entities: List[SensorEntity] = []
+            new_entities: list[SensorEntity] = []
             for dev in butlers_now:
                 if dev["yid"] in new_ids:
                     new_entities.extend(_create_entities(dev))
@@ -140,12 +145,6 @@ async def async_setup_entry(
                     dev_reg.async_remove_device(device.id)
             known_ids.difference_update(removed_ids)
 
-            # 可选：如果 mqtt_bridge 支持取消订阅，可以在这里调用
-            # for dev in removed_ids:
-            #     xqid = dev.get("xqid")
-            #     if xqid and xqid in subscribed_ids:
-            #         entry.runtime_data.mqtt_bridge.unsubscribe_device(xqid)
-            #         subscribed_ids.remove(xqid)
 
     coordinator.async_add_listener(_handle_butler_changes)
 
@@ -159,7 +158,7 @@ class ButlerBaseSensor(IntegrationBlueprintEntity, SensorEntity):
     _attr_has_entity_name = True
     _attr_state_class = SensorStateClass.MEASUREMENT
 
-    def __init__(self, coordinator: "BlueprintDataUpdateCoordinator", dev: Dict, kind: str):
+    def __init__(self, coordinator: BlueprintDataUpdateCoordinator, dev: dict, kind: str):
         super().__init__(coordinator)
         self._kind = kind  # "tem" / "hum" / "lum"
         self._device_id = dev["yid"]
@@ -169,14 +168,14 @@ class ButlerBaseSensor(IntegrationBlueprintEntity, SensorEntity):
     # ------------------------------------------------------------------
     # Helpers
     # ------------------------------------------------------------------
-    def _latest(self) -> Dict | None:
+    def _latest(self) -> dict | None:
         """Return latest device dict from coordinator cache."""
         for d in self.coordinator.data.get("devices_by_type", {}).get("IntelligentButler", []):
             if d["yid"] == self._device_id:
                 return d
         return None
 
-    def _parse_cap(self) -> Dict[str, str]:
+    def _parse_cap(self) -> dict[str, str]:
         dev = self._latest() or self._dev_initial
         cap_raw = dev.get("dcap", "")  # e.g. "wake:null;sen:5;tem:28;hum:57;lum:05"
         return {
@@ -248,7 +247,7 @@ class ButlerHumiditySensor(ButlerBaseSensor):
 
     _attr_device_class = SensorDeviceClass.HUMIDITY
     _attr_native_unit_of_measurement = PERCENTAGE
-    _attr_name = "湿度" 
+    _attr_name = "湿度"
 
     def __init__(self, coordinator, dev):
         super().__init__(coordinator, dev, "hum")

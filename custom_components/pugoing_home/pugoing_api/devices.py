@@ -48,14 +48,14 @@ class TemperatureControlPanel(DeviceBase):
 
     def parse_dcap(self, dcap):
         # 解析 dcap 字符串
-        params = dict(item.split(':') for item in dcap.split(';') if item)
-        self.power = self.POWER_MAP.get(params.get('power', '00'), 'OFF')
-        self.temperature = int(params.get('tem', 25))
-        mod_code = params.get('mod')
-        self.mode = self.MODE_MAP.get(mod_code, 'UNKNOWN') if mod_code else 'UNKNOWN'
-        ws_code = params.get('ws')
-        self.wind_speed = self.WIND_SPEED_MAP.get(ws_code, 'UNKNOWN') if ws_code else 'UNKNOWN'
-        rtem = params.get('rtem')
+        params = dict(item.split(":") for item in dcap.split(";") if item)
+        self.power = self.POWER_MAP.get(params.get("power", "00"), "OFF")
+        self.temperature = int(params.get("tem", 25))
+        mod_code = params.get("mod")
+        self.mode = self.MODE_MAP.get(mod_code, "UNKNOWN") if mod_code else "UNKNOWN"
+        ws_code = params.get("ws")
+        self.wind_speed = self.WIND_SPEED_MAP.get(ws_code, "UNKNOWN") if ws_code else "UNKNOWN"
+        rtem = params.get("rtem")
         self.room_temperature = int(rtem) if rtem else None
         return self
 
@@ -73,14 +73,14 @@ class TemperatureControlPanel(DeviceBase):
         """
         设置模式
         参数:
-            mode (str): 模式名称，取值为 "AUTO", "COOL", "DEHUMIDIFICATION", "FAN", "HEAT"
+            mode (str): 模式名称,取值为 "AUTO", "COOL", "DEHUMIDIFICATION", "FAN", "HEAT"
         返回:
             str: 对应的 dkey
         """
         mode = mode.upper()
         mode_code = self.MODE_MAP_REVERSE.get(mode)
         if not mode_code:
-            raise ValueError(f"未知的模式：{mode}")
+            raise ValueError(f"未知的模式:{mode}")
         mode_dkey_map = {
             "COOL": "VRV_MCOLD",
             "HEAT": "VRV_MHOT",
@@ -97,7 +97,7 @@ class TemperatureControlPanel(DeviceBase):
         """
         设置风速
         参数:
-            speed (str): 风速名称，取值为 "HIGH", "MEDIUM", "LOW", "AUTO"
+            speed (str): 风速名称,取值为 "HIGH", "MEDIUM", "LOW", "AUTO"
         返回:
             str: 对应的 dkey
         """
@@ -106,12 +106,12 @@ class TemperatureControlPanel(DeviceBase):
         speed = speed.upper()
         speed_code = self.WIND_SPEED_MAP_REVERSE.get(speed)
         if not speed_code:
-            raise ValueError(f"未知的风速：{speed}")
+            raise ValueError(f"未知的风速:{speed}")
         speed_dkey_map = {
             "HIGH": "VRV_WSH",
             "MEDIUM": "VRV_WSM",
             "LOW": "VRV_WSL",
-            # 如果有其他风速对应的 dkey，可以在这里添加
+            # 如果有其他风速对应的 dkey,可以在这里添加
             "AUTO": "VRV_WSAUTO"  # 假设有对应的 dkey
         }
         dkey = speed_dkey_map.get(speed)
@@ -123,7 +123,7 @@ class TemperatureControlPanel(DeviceBase):
         """
         设置温度
         参数:
-            temp (int): 温度值，16-30 之间的整数
+            temp (int): 温度值,16-30 之间的整数
         返回:
             str: 对应的 dkey
         """
